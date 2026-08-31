@@ -7,10 +7,35 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-enum FuelType { DIESEL GASOLINE_95 GASOLINE_100 LPG CNG }
-enum SourceKind { API OFFICIAL_SITE STRUCTURED_ENDPOINT HTML_PUBLIC }
-enum SourceStatus { ONLINE DEGRADED ERROR DISABLED }
-enum AlertKind { PRICE_BELOW PRICE_CHANGE STATION REGION MARKET }
+enum FuelType {
+  DIESEL
+  GASOLINE_95
+  GASOLINE_100
+  LPG
+  CNG
+}
+
+enum SourceKind {
+  API
+  OFFICIAL_SITE
+  STRUCTURED_ENDPOINT
+  HTML_PUBLIC
+}
+
+enum SourceStatus {
+  ONLINE
+  DEGRADED
+  ERROR
+  DISABLED
+}
+
+enum AlertKind {
+  PRICE_BELOW
+  PRICE_CHANGE
+  STATION
+  REGION
+  MARKET
+}
 
 model Station {
   id String @id @default(cuid())
