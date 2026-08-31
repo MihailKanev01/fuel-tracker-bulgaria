@@ -3,3 +3,50 @@
 @media (max-width:760px) { .shell,.admin { padding:0 18px } header { gap:15px; height:66px } nav { display:none }.hero { padding:48px 0 34px; align-items:flex-start; gap:25px }.hero-chip { min-width:110px; padding-left:14px }.hero h1 { letter-spacing:-2.7px }.primary-card { padding:20px 16px 12px }.price-head h2 { font-size:31px }.fresh { font-size:10px }.stats,.grid { grid-template-columns:1fr 1fr; gap:8px }.stats article { padding:14px }.stats strong { font-size:18px }.grid { display:block }.panel { margin-bottom:10px; padding:16px }.insight { padding:20px; margin-top:25px }.pending { display:none }.source-table { overflow-x:auto }.source-row { min-width:760px } }
 
 .fuel-map { height:160px; overflow:hidden; position:relative; margin-top:16px; border:1px solid #273530; border-radius:8px; background:radial-gradient(circle at 58% 35%,#273b32,#111a18 65%) }.fuel-map svg { width:100%; height:100%; opacity:.85 }.fuel-map path { fill:#1a2a24; stroke:#416053; stroke-width:2 }.map-pin { position:absolute; transform:translate(-50%,-50%); width:9px; height:9px; border-radius:50%; background:var(--lime); box-shadow:0 0 0 4px #c8f65b22,0 0 15px #c8f65b }.map-pin span { position:absolute; bottom:13px; left:50%; transform:translateX(-50%); display:none; color:#dfe9e2; white-space:nowrap; font:9px 'DM Mono'; padding:4px; border-radius:4px; background:#0c1210 }.map-pin:hover span { display:block }.fuel-map p { position:absolute; left:10px; bottom:7px; margin:0; color:#8a9993; font:9px 'DM Mono' }
+
+/* Readability pass: dashboard metadata must remain legible at normal zoom. */
+body { font-size:16px }
+.brand { font-size:22px }
+.brand i { font-size:11px }
+nav { font-size:15px }
+.live { padding:10px 14px; font-size:12px }
+.eyebrow { font-size:12px }
+.hero h1 { font-size:clamp(44px,5.5vw,76px) }
+.lede { max-width:500px; font-size:16px }
+.hero-chip { min-width:180px }
+.hero-chip span,.hero-chip small { font-size:12px }
+.hero-chip strong { font-size:34px }
+.primary-card { padding:30px 32px 20px }
+.price-head p { font-size:12px }
+.price-head h2 { font-size:50px }
+.price-head h2 small { font-size:15px }
+.movement { font-size:14px }
+.fresh { font-size:14px; gap:5px }
+.fresh small { font-size:12px }
+.periods button { padding:8px 14px; font-size:13px }
+.empty { font-size:15px }
+.stats article { padding:20px 21px; gap:8px }
+.stats span,.stats small { font-size:12px }
+.stats strong { font-size:27px }
+.panel { padding:23px }
+.panel-title h3 { font-size:13px }
+.panel-title a { font-size:12px }
+.station,.change { min-height:72px }
+.station>b { font-size:13px }
+.station strong,.change strong { font-size:15px }
+.station span,.change small { font-size:12px; margin-top:5px }
+.arrow { width:29px; height:29px; font-size:17px }
+.change > b { font-size:12px }
+.insight { padding:33px; gap:22px }
+.signal { font-size:39px }
+.insight h3 { font-size:27px }
+.insight p:not(.eyebrow) { font-size:15px }
+.pending { padding:9px 12px; font-size:12px }
+footer { padding:24px 0 45px; font-size:12px }
+.admin h1 { font-size:50px }
+.admin-lede { font-size:16px }
+.source-row { min-height:78px; padding:14px 21px; font-size:14px }
+.source-row small { font-size:11px }
+.source-head { font-size:11px }
+.status { padding:6px 8px; font-size:11px }
+.fuel-map p { font-size:11px }
