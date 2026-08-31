@@ -1,0 +1,126 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum FuelType { DIESEL GASOLINE_95 GASOLINE_100 LPG CNG }
+enum SourceKind { API OFFICIAL_SITE STRUCTURED_ENDPOINT HTML_PUBLIC }
+enum SourceStatus { ONLINE DEGRADED ERROR DISABLED }
+enum AlertKind { PRICE_BELOW PRICE_CHANGE STATION REGION MARKET }
+
+model Station {
+  id String @id @default(cuid())
+  name String
+  brand String?
+  address String
+  city String
+  region String?
+  latitude Decimal? @db.Decimal(9,6)
+  longitude Decimal? @db.Decimal(9,6)
+  active Boolean @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  prices Price[]
+  changes PriceChange[]
+  @@unique([name, address, city])
+  @@index([city, brand])
+}
+
+model Source {
+  id String @id @default(cuid())
+  name String @unique
+  kind SourceKind
+  baseUrl String
+  status SourceStatus @default(DISABLED)
+  reliability Int @default(50)
+  lastAttemptAt DateTime?
+  lastSuccessAt DateTime?
+  recordsSeen Int @default(0)
+  errorMessage String?
+  createdAt DateTime @default(now())
+  prices Price[]
+  fetchRuns FetchRun[]
+}
+
+model Price {
+  id String @id @default(cuid())
+  stationId String
+  sourceId String
+  fuelType FuelType
+  priceEur Decimal @db.Decimal(6,3)
+  observedAt DateTime
+  fetchedAt DateTime @default(now())
+  originalPrice Decimal? @db.Decimal(7,3)
+  originalCurrency String?
+  originalUrl String
+  confidence Int
+  anomaly Boolean @default(false)
+  anomalyReason String?
+  station Station @relation(fields: [stationId], references: [id], onDelete: Cascade)
+  source Source @relation(fields: [sourceId], references: [id])
+  @@index([fuelType, observedAt])
+  @@index([stationId, fuelType, observedAt])
+}
+
+model PriceChange {
+  id String @id @default(cuid())
+  stationId String
+  fuelType FuelType
+  oldPriceEur Decimal @db.Decimal(6,3)
+  newPriceEur Decimal @db.Decimal(6,3)
+  changeEur Decimal @db.Decimal(6,3)
+  changePercent Decimal @db.Decimal(7,3)
+  detectedAt DateTime @default(now())
+  sourceUrl String
+  station Station @relation(fields: [stationId], references: [id], onDelete: Cascade)
+  @@index([detectedAt])
+}
+
+model FetchRun {
+  id String @id @default(cuid())
+  sourceId String
+  startedAt DateTime @default(now())
+  completedAt DateTime?
+  recordsFetched Int @default(0)
+  accepted Int @default(0)
+  rejected Int @default(0)
+  errorMessage String?
+  source Source @relation(fields: [sourceId], references: [id], onDelete: Cascade)
+}
+
+model NewsItem {
+  id String @id @default(cuid())
+  title String
+  url String @unique
+  publisher String
+  publishedAt DateTime
+  summary String?
+  impact String?
+  createdAt DateTime @default(now())
+}
+
+model MarketDatum {
+  id String @id @default(cuid())
+  metric String
+  value Decimal @db.Decimal(12,4)
+  unit String
+  observedAt DateTime
+  sourceUrl String
+  @@unique([metric, observedAt])
+}
+
+model Alert {
+  id String @id @default(cuid())
+  userKey String
+  kind AlertKind
+  fuelType FuelType @default(DIESEL)
+  threshold Decimal? @db.Decimal(7,3)
+  stationId String?
+  city String?
+  active Boolean @default(true)
+  createdAt DateTime @default(now())
+}
