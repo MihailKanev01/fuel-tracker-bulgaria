@@ -3,6 +3,7 @@ import { FuelType } from "@prisma/client";
 import { fuelOverview } from "@/lib/queries";
 
 export const dynamic = "force-dynamic";
+export const revalidate = 0;
 
 const aliases: Record<string, FuelType> = {
   diesel: "DIESEL",
@@ -18,5 +19,17 @@ export async function GET(_request: Request, context: { params: Promise<{ fuel: 
   const { fuel } = await context.params;
   const fuelType = aliases[fuel.toLowerCase()];
   if (!fuelType) return NextResponse.json({ error: "Unsupported fuel type" }, { status: 400 });
-  return NextResponse.json(await fuelOverview(fuelType), { headers: { "Cache-Control": "public, s-maxage=60, stale-while-revalidate=120" } });
+
+  try {
+    const result = await fuelOverview(fuelType);
+    return NextResponse.json(result, {
+      headers: { "Cache-Control": "no-store, max-age=0" },
+    });
+  } catch (error) {
+    console.error(`Fuel overview error (${fuel}):`, error);
+    return NextResponse.json(
+      { error: "Неуспяхме да заредим данните за горивото." },
+      { status: 500, headers: { "Cache-Control": "no-store, max-age=0" } },
+    );
+  }
 }
