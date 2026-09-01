@@ -135,7 +135,7 @@ export function Dashboard() {
         {news.length ? <div className="news-summary">{goodNews.length ? <div className="news-group"><div className="news-label rise">🟢 ДОБРИ НОВИНИ</div>{goodNews.map((item) => <a className="news-item" key={item.id} href={item.url} target="_blank" rel="noreferrer"><strong>{item.title}</strong><span>{item.publisher} · {age(item.publishedAt)}</span></a>)}</div> : null}{badNews.length ? <div className="news-group"><div className="news-label fall">🔴 ЛОШИ НОВИНИ</div>{badNews.map((item) => <a className="news-item" key={item.id} href={item.url} target="_blank" rel="noreferrer"><strong>{item.title}</strong><span>{item.publisher} · {age(item.publishedAt)}</span></a>)}</div> : null}{!goodNews.length && !badNews.length && neutralNews.length ? <div className="news-group"><div className="news-label">⚪ НЕУТРАЛНО</div>{neutralNews.map((item) => <a className="news-item" key={item.id} href={item.url} target="_blank" rel="noreferrer"><strong>{item.title}</strong><span>{item.publisher} · {age(item.publishedAt)}</span></a>)}</div> : null}</div> : <Empty label="Все още няма събрани новини за пазара на горива."/>}
       </article></section>
     <DieselForecast />
-    <footer>FUEL TRACKER BULGARIA <span>·</span> Цените се публикуват с източник, час и индикатор за свежест.</span></footer>
+    <footer>FUEL TRACKER BULGARIA <span>·</span> Цените се публикуват с източник, час и индикатор за свежест.</footer>
   </main>;
 }
 function Empty({ label }: { label: string }) { return <div className="empty"><span>◌</span>{label}</div>; }
