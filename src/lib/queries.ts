@@ -19,7 +19,9 @@ function median(values: number[]) {
   if (!values.length) return null;
   const sorted = [...values].sort((a, b) => a - b);
   const middle = Math.floor(sorted.length / 2);
-  return sorted.length % 2 ? sorted[middle] : (sorted[middle - 1] + sorted[middle]) / 2;
+  return sorted.length % 2 === 0
+    ? (sorted[middle - 1] + sorted[middle]) / 2
+    : sorted[middle];
 }
 
 export async function fuelOverview(fuelType: FuelType) {
@@ -56,45 +58,51 @@ export async function fuelOverview(fuelType: FuelType) {
 
   const metricKey = fuelMetricKey(fuelType);
   const averageMetric = `fuel.${metricKey}.average`;
-  const marketRows = await prisma.marketDatum.findMany({
-    where: {
-      OR: [
-        { metric: averageMetric },
-        { metric: { startsWith: `provider.`, endsWith: `.${metricKey}` } },
-      ],
-    },
+
+  // Keep the market fallback deliberately simple and independent from the
+  // provider query. This mirrors the original working Diesel overview path
+  // and also works when a fuel has only a stored national average (notably A100).
+  const national = await prisma.marketDatum.findFirst({
+    where: { metric: averageMetric },
+    orderBy: { observedAt: "desc" },
+    select: { value: true, observedAt: true },
+  });
+
+  const providerRows = await prisma.marketDatum.findMany({
+    where: { metric: { startsWith: "provider.", endsWith: `.${metricKey}` } },
     orderBy: { observedAt: "desc" },
     select: { metric: true, value: true, observedAt: true },
   });
 
-  // Prefer the explicitly published national average when available. Otherwise
-  // aggregate the latest provider observations (useful especially for A100).
-  const national = marketRows.find((row) => row.metric === averageMetric);
-  let statisticRows = national ? marketRows.filter((row) => row.observedAt.getTime() === national.observedAt.getTime() && row.metric === averageMetric) : [];
-
-  if (!national) {
-    const latestByProvider = new Map<string, { value: number; observedAt: Date }>();
-    for (const row of marketRows) {
-      if (row.metric === averageMetric) continue;
-      const provider = row.metric.slice("provider.".length, -(metricKey.length + 1));
-      if (!latestByProvider.has(provider)) latestByProvider.set(provider, { value: row.value.toNumber(), observedAt: row.observedAt });
-    }
-    statisticRows = [...latestByProvider.entries()].map(([, row]) => ({ metric: `provider.${metricKey}`, value: new Prisma.Decimal(row.value), observedAt: row.observedAt }));
+  const latestByProvider = new Map<string, { value: number; observedAt: Date }>();
+  for (const row of providerRows) {
+    const name = row.metric.slice("provider.".length, -(metricKey.length + 1));
+    if (!name || latestByProvider.has(name)) continue;
+    latestByProvider.set(name, { value: row.value.toNumber(), observedAt: row.observedAt });
   }
 
-  const marketValues = statisticRows.map((row) => row.value.toNumber()).filter(Number.isFinite);
-  const marketLatest = statisticRows.reduce<Date | null>((max, row) => (!max || row.observedAt > max ? row.observedAt : max), null);
-  const average = national?.value.toNumber() ?? (marketValues.length ? marketValues.reduce((sum, value) => sum + value, 0) / marketValues.length : null);
+  const providerValues = [...latestByProvider.values()]
+    .map((row) => row.value)
+    .filter(Number.isFinite);
+
+  const average = national?.value.toNumber() ?? (providerValues.length
+    ? providerValues.reduce((sum, value) => sum + value, 0) / providerValues.length
+    : null);
+
+  const statisticValues = providerValues.length ? providerValues : (national ? [national.value.toNumber()] : []);
+  const latest = national?.observedAt ?? [...latestByProvider.values()]
+    .map((row) => row.observedAt)
+    .sort((a, b) => b.getTime() - a.getTime())[0] ?? null;
 
   return {
     average,
-    lowest: marketValues.length ? Math.min(...marketValues) : null,
-    highest: marketValues.length ? Math.max(...marketValues) : null,
-    median: median(marketValues),
+    lowest: statisticValues.length ? Math.min(...statisticValues) : null,
+    highest: statisticValues.length ? Math.max(...statisticValues) : null,
+    median: median(statisticValues),
     stationCount: 0,
     sourceCount: sources,
-    confidence: average != null ? 60 : null,
-    latest: national?.observedAt ?? marketLatest,
+    confidence: average != null ? (providerValues.length >= 5 ? 75 : providerValues.length >= 2 ? 70 : 60) : null,
+    latest,
     dataType: average != null ? "MARKET_AVERAGE" as const : "NO_DATA" as const,
   };
 }
