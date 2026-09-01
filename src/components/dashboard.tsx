@@ -45,7 +45,7 @@ export function Dashboard() {
       fetch(`/api/fuels/${fuel}`).then((r) => r.json()),
       fetch(`/api/fuels/${fuel}/history?days=${period}`).then((r) => r.json()),
       fetch(`/api/prices/cheapest?fuel=${fuel}&limit=5`).then((r) => r.json()),
-      fetch("/api/prices/changes").then((r) => r.json()),
+      fetch(`/api/prices/changes?fuel=${fuel}`).then((r) => r.json()),
       fetch("/api/news").then((r) => r.json()),
     ]).then(([a, b, c, d, e]) => {
       setOverview(a);
@@ -114,9 +114,9 @@ export function Dashboard() {
 
   return <main className="shell">
     <header><a className="brand" href="/">Fuel<span>Tracker</span><i>BG</i></a><nav><a className="active" href="#overview">Обзор</a><a href="#cheapest">Най-евтин</a><a href="#changes">Промени</a><a href="#forecast">Прогноза</a><a href="/admin">Админ</a></nav><button className="live"><b /> Данни на живо</button></header>
+    <section className="fuel-selector" aria-label="Избор на гориво"><div><p className="eyebrow">ИЗБЕРИ ГОРИВО</p><h2>{fuelLabel(fuel)}</h2><small>Всички показатели на страницата се променят според избраното гориво.</small></div><div className="fuel-options">{FUEL_OPTIONS.map((option) => <button key={option.key} type="button" onClick={() => setFuel(option.key)} className={fuel === option.key ? "selected" : ""}><span>{option.label}</span>{option.key === "diesel" ? <em>най-популярно</em> : null}</button>)}</div></section>
     <section className="hero" id="overview"><div><p className="eyebrow">БЪЛГАРИЯ · {fuelLabel(fuel).toUpperCase()}</p><h1>Цената на <em>{fuelLabel(fuel).toLowerCase()},</em><br />без догадки.</h1><p className="lede">Показваме проследими цени с посочен източник и време на наблюдение.</p></div><div className="hero-chip"><span>Надеждност</span><strong>{overview?.confidence ?? "—"}{overview?.confidence != null && "%"}</strong><small>{overview?.stationCount ?? 0} валидни обекта</small></div></section>
     <section className="primary-card"><div className="price-head"><div><p>СРЕДНА ЦЕНА · {fuelLabel(fuel).toUpperCase()}</p><h2>{hasData ? fmt.format(overview!.average!) : "Няма данни"}<small>{hasData && " / литър"}</small></h2><div className={movement && movement.value >= 0 ? "movement up" : "movement down"}>{movement ? `${movement.value >= 0 ? "▲" : "▼"} ${fmt.format(Math.abs(movement.value))} · ${Math.abs(movement.percent).toFixed(1)}% за избрания период` : "Няма достатъчно история за тренд"}</div></div><div className="fresh"><span className={overview?.latest ? "dot fresh" : "dot"} />Последно обновяване: <b>{age(overview?.latest ?? null)}</b><small>{overview?.sourceCount ?? 0} потвърдени източника</small></div></div>
-      <div className="periods fuel-tabs">{FUEL_OPTIONS.map((option) => <button key={option.key} onClick={() => setFuel(option.key)} className={fuel === option.key ? "selected" : ""}>{option.label}</button>)}</div>
       <div className="periods">{[[1,"24ч"],[7,"7 дни"],[30,"30 дни"],[90,"3 мес"],[365,"1 год"]].map(([value,label]) => <button key={String(value)} onClick={() => setPeriod(Number(value))} className={period === value ? "selected" : ""}>{label}</button>)}</div>
       <div className="chart-wrap">{history.length ? <ResponsiveContainer width="100%" height={290}><AreaChart data={history}><defs><linearGradient id="fuel" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stopColor="#bfef4b" stopOpacity=".36"/><stop offset="100%" stopColor="#bfef4b" stopOpacity="0"/></linearGradient></defs><CartesianGrid vertical={false} stroke="#23302f"/><XAxis dataKey="date" tickLine={false} axisLine={false} tick={{ fill: "#778481", fontSize: 11 }}/><YAxis domain={["dataMin - 0.01", "dataMax + 0.01"]} tickFormatter={(v) => `€${v.toFixed(2)}`} tickLine={false} axisLine={false} tick={{ fill: "#778481", fontSize: 11 }}/><Tooltip contentStyle={{ background: "#15201f", border: "1px solid #30413e", borderRadius: 10 }} formatter={(v) => fmt.format(Number(v))}/><Area type="monotone" dataKey="average" stroke="#c6f44d" strokeWidth={3} fill="url(#fuel)" /></AreaChart></ResponsiveContainer> : <Empty label={loading ? `Зареждаме ${fuelLabel(fuel)}…` : `Все още няма валидирани наблюдения за ${fuelLabel(fuel)}.`}/>}</div>
     </section>
@@ -135,7 +135,7 @@ export function Dashboard() {
         {news.length ? <div className="news-summary">{goodNews.length ? <div className="news-group"><div className="news-label rise">🟢 ДОБРИ НОВИНИ</div>{goodNews.map((item) => <a className="news-item" key={item.id} href={item.url} target="_blank" rel="noreferrer"><strong>{item.title}</strong><span>{item.publisher} · {age(item.publishedAt)}</span></a>)}</div> : null}{badNews.length ? <div className="news-group"><div className="news-label fall">🔴 ЛОШИ НОВИНИ</div>{badNews.map((item) => <a className="news-item" key={item.id} href={item.url} target="_blank" rel="noreferrer"><strong>{item.title}</strong><span>{item.publisher} · {age(item.publishedAt)}</span></a>)}</div> : null}{!goodNews.length && !badNews.length && neutralNews.length ? <div className="news-group"><div className="news-label">⚪ НЕУТРАЛНО</div>{neutralNews.map((item) => <a className="news-item" key={item.id} href={item.url} target="_blank" rel="noreferrer"><strong>{item.title}</strong><span>{item.publisher} · {age(item.publishedAt)}</span></a>)}</div> : null}</div> : <Empty label="Все още няма събрани новини за пазара на горива."/>}
       </article></section>
     <DieselForecast />
-    <footer>FUEL TRACKER BULGARIA <span>·</span> Цените се публикуват с източник, час и индикатор за свежест.</footer>
+    <footer>FUEL TRACKER BULGARIA <span>·</span> Цените се публикуват с източник, час и индикатор за свежест.</span></footer>
   </main>;
 }
 function Empty({ label }: { label: string }) { return <div className="empty"><span>◌</span>{label}</div>; }
