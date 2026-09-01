@@ -113,6 +113,7 @@ function parseInfoWindow(
   }> = [
     { fuel: "DIESEL", regex: /title=["']Diesel:\s*([0-9]+(?:[.,][0-9]+)?)\s*€\/л/i },
     { fuel: "GASOLINE_95", regex: /title=["']A95:\s*([0-9]+(?:[.,][0-9]+)?)\s*€\/л/i },
+    { fuel: "GASOLINE_100", regex: /title=["'](?:A100|Gasoline 100|100):\s*([0-9]+(?:[.,][0-9]+)?)\s*€\/л/i },
     { fuel: "LPG", regex: /title=["']LPG:\s*([0-9]+(?:[.,][0-9]+)?)\s*€\/л/i },
     { fuel: "CNG", regex: /title=["'](?:CNG|Methane):\s*([0-9]+(?:[.,][0-9]+)?)\s*€\/л/i },
   ];
