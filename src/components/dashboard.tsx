@@ -2,6 +2,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { Area, AreaChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { LocationMap } from "./location-map";
+import { DieselForecast } from "./diesel-forecast";
 
 type Overview = { average: number | null; lowest: number | null; highest: number | null; median: number | null; stationCount: number; sourceCount: number; confidence: number | null; latest: string | null };
 type Point = { date: string; average: number; minimum: number; maximum: number };
@@ -117,7 +118,7 @@ export function Dashboard() {
   const shownStations = coords ? nearby : [];
 
   return <main className="shell">
-    <header><a className="brand" href="/">Fuel<span>Tracker</span><i>BG</i></a><nav><a className="active" href="#overview">Обзор</a><a href="#cheapest">Най-евтин</a><a href="#changes">Промени</a><a href="#market">Пазар</a><a href="/admin">Админ</a></nav><button className="live"><b /> Данни на живо</button></header>
+    <header><a className="brand" href="/">Fuel<span>Tracker</span><i>BG</i></a><nav><a className="active" href="#overview">Обзор</a><a href="#cheapest">Най-евтин</a><a href="#changes">Промени</a><a href="#forecast">Прогноза</a><a href="/admin">Админ</a></nav><button className="live"><b /> Данни на живо</button></header>
     <section className="hero" id="overview"><div><p className="eyebrow">БЪЛГАРИЯ · DIESEL</p><h1>Цената на <em>дизела,</em><br />без догадки.</h1><p className="lede">Показваме проследими цени с посочен източник и време на наблюдение.</p></div><div className="hero-chip"><span>Надеждност</span><strong>{overview?.confidence ?? "—"}{overview?.confidence != null && "%"}</strong><small>{overview?.stationCount ?? 0} валидни обекта</small></div></section>
     <section className="primary-card"><div className="price-head"><div><p>СРЕДНА ЦЕНА · DIESEL</p><h2>{hasData ? fmt.format(overview!.average!) : "Няма данни"}<small>{hasData && " / литър"}</small></h2><div className={movement && movement.value >= 0 ? "movement up" : "movement down"}>{movement ? `${movement.value >= 0 ? "▲" : "▼"} ${fmt.format(Math.abs(movement.value))} · ${Math.abs(movement.percent).toFixed(1)}% за избрания период` : "Няма достатъчно история за тренд"}</div></div><div className="fresh"><span className={overview?.latest ? "dot fresh" : "dot"} />Последно обновяване: <b>{age(overview?.latest ?? null)}</b><small>{overview?.sourceCount ?? 0} потвърдени източника</small></div></div>
       <div className="periods">{[[1,"24ч"],[7,"7 дни"],[30,"30 дни"],[90,"3 мес"],[365,"1 год"]].map(([value,label]) => <button key={String(value)} onClick={() => setPeriod(Number(value))} className={period === value ? "selected" : ""}>{label}</button>)}</div>
@@ -133,7 +134,7 @@ export function Dashboard() {
       {!coords && !locationLoading && !locationError ? <div className="empty">◌ Разреши местоположението си, за да покажем най-евтиния дизел около теб.</div> : null}
       {coords && !nearbyLoading && nearby.length === 0 && !locationError ? <div className="empty">◌ Няма станции с валидна цена в радиус {radius} km.</div> : null}
       <LocationMap latitude={coords?.lat ?? null} longitude={coords?.lon ?? null} radiusKm={radius} stations={shownStations}/></article>
-      <article className="panel" id="changes"><div className="panel-title"><div><h3>ПОСЛЕДНИ ПРОМЕНИ</h3><small style={{ opacity: 0.7 }}>{marketSignal.label}</small></div><a href="#market">Пазар →</a></div>
+      <article className="panel" id="changes"><div className="panel-title"><div><h3>ПОСЛЕДНИ ПРОМЕНИ</h3><small style={{ opacity: 0.7 }}>{marketSignal.label}</small></div><a href="#forecast">Прогноза →</a></div>
         {changes.length ? <div className="change-list">{changes.slice(0,3).map((change) => <a key={change.id} className="change" href={change.sourceUrl} target="_blank" rel="noreferrer"><div className={change.change >= 0 ? "arrow rise" : "arrow fall"}>{change.change >= 0 ? "↑" : "↓"}</div><div><strong>{change.station} <span>· {change.city}</span></strong><small>{fmt.format(change.oldPrice)} → {fmt.format(change.newPrice)} · {age(change.detectedAt)}</small></div><b className={change.change >= 0 ? "rise" : "fall"}>{change.change >= 0 ? "+" : ""}{fmt.format(change.change)}</b></a>)}</div> : null}
         {news.length ? <div className="news-summary">
           {goodNews.length ? <div className="news-group"><div className="news-label rise">🟢 ДОБРИ НОВИНИ</div>{goodNews.map((item) => <a className="news-item" key={item.id} href={item.url} target="_blank" rel="noreferrer"><strong>{item.title}</strong><span>{item.publisher} · {age(item.publishedAt)}</span></a>)}</div> : null}
@@ -141,7 +142,7 @@ export function Dashboard() {
           {!goodNews.length && !badNews.length && neutralNews.length ? <div className="news-group"><div className="news-label">⚪ НЕУТРАЛНО</div>{neutralNews.map((item) => <a className="news-item" key={item.id} href={item.url} target="_blank" rel="noreferrer"><strong>{item.title}</strong><span>{item.publisher} · {age(item.publishedAt)}</span></a>)}</div> : null}
         </div> : <Empty label="Все още няма събрани новини за пазара на горива."/>}
       </article></section>
-    <section className="insight" id="market"><div className="signal">⌁</div><div><p className="eyebrow">ПАЗАРЕН КОНТЕКСТ</p><h3>{marketSignal.label}</h3><p>Обобщението се базира на последните събрани пазарни новини и наблюдаваните промени в цените. То показва посоката на сигналите, а не доказва причинно-следствена връзка.</p></div><span className="pending">{news.length ? `${news.length} новини` : "Очаква новини"}</span></section>
+    <DieselForecast />
     <footer>FUEL TRACKER BULGARIA <span>·</span> Цените се публикуват с източник, час и индикатор за свежест.</footer>
   </main>;
 }
