@@ -56,9 +56,11 @@ export function LocationMap({ latitude, longitude, radiusKm, stations }: {
   stations: Station[];
 }) {
   const mapRef = useRef<HTMLDivElement | null>(null);
+  const containerRef = useRef<HTMLDivElement | null>(null);
   const instanceRef = useRef<any>(null);
   const layerRef = useRef<any>(null);
   const [precisePosition, setPrecisePosition] = useState<{ lat: number; lon: number; accuracy: number } | null>(null);
+  const [fullscreen, setFullscreen] = useState(false);
 
   useEffect(() => {
     if (!("geolocation" in navigator)) return;
@@ -85,6 +87,17 @@ export function LocationMap({ latitude, longitude, radiusKm, stations }: {
       mounted = false;
       navigator.geolocation.clearWatch(watchId);
     };
+  }, []);
+
+  useEffect(() => {
+    const onFullscreenChange = () => {
+      const active = document.fullscreenElement === containerRef.current;
+      setFullscreen(active);
+      setTimeout(() => instanceRef.current?.invalidateSize(), 100);
+    };
+
+    document.addEventListener("fullscreenchange", onFullscreenChange);
+    return () => document.removeEventListener("fullscreenchange", onFullscreenChange);
   }, []);
 
   const userLat = precisePosition?.lat ?? latitude;
@@ -198,6 +211,21 @@ export function LocationMap({ latitude, longitude, radiusKm, stations }: {
     };
   }, []);
 
+  const toggleFullscreen = async () => {
+    const element = containerRef.current;
+    if (!element) return;
+
+    try {
+      if (document.fullscreenElement === element) {
+        await document.exitFullscreen();
+      } else {
+        await element.requestFullscreen();
+      }
+    } catch (error) {
+      console.error("Map fullscreen error:", error);
+    }
+  };
+
   if (userLat == null || userLon == null) {
     return (
       <div style={{
@@ -223,16 +251,67 @@ export function LocationMap({ latitude, longitude, radiusKm, stations }: {
   }
 
   return (
-    <div style={{
-      position: "relative",
-      height: 280,
-      marginTop: 16,
-      overflow: "hidden",
-      border: "1px solid #273530",
-      borderRadius: 10,
-      background: "#111a18",
-    }}>
+    <div
+      ref={containerRef}
+      style={{
+        position: "relative",
+        height: fullscreen ? "100vh" : 280,
+        width: "100%",
+        marginTop: fullscreen ? 0 : 16,
+        overflow: "hidden",
+        border: fullscreen ? "0" : "1px solid #273530",
+        borderRadius: fullscreen ? 0 : 10,
+        background: "#111a18",
+      }}
+    >
       <div ref={mapRef} style={{ height: "100%", width: "100%" }} />
+
+      <button
+        type="button"
+        onClick={toggleFullscreen}
+        aria-label={fullscreen ? "Затвори цял екран" : "Отвори картата на цял екран"}
+        title={fullscreen ? "Затвори цял екран" : "Цял екран"}
+        style={{
+          position: "absolute",
+          top: 10,
+          right: 10,
+          zIndex: 1000,
+          width: 40,
+          height: 40,
+          display: "grid",
+          placeItems: "center",
+          border: "1px solid #395044",
+          borderRadius: 10,
+          background: "rgba(11,17,16,.92)",
+          color: "#d7e1dc",
+          cursor: "pointer",
+          fontSize: 20,
+          lineHeight: 1,
+          boxShadow: "0 8px 24px rgba(0,0,0,.28)",
+          backdropFilter: "blur(8px)",
+        }}
+      >
+        {fullscreen ? "✕" : "⛶"}
+      </button>
+
+      {fullscreen ? (
+        <div style={{
+          position: "absolute",
+          top: 10,
+          left: 10,
+          zIndex: 1000,
+          padding: "8px 11px",
+          border: "1px solid #395044",
+          borderRadius: 9,
+          background: "rgba(11,17,16,.92)",
+          color: "#d7e1dc",
+          font: "11px DM Mono, monospace",
+          backdropFilter: "blur(8px)",
+        }}>
+          Около теб · {radiusKm} km
+        </div>
+      ) : null}
+
       <div style={{
         position: "absolute",
         left: 10,
