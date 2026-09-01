@@ -15,8 +15,6 @@ const FEEDS = [
   },
 ];
 
-const DAY_MS = 86_400_000;
-
 function decode(value: string) {
   return value
     .replace(/<!\[CDATA\[([\s\S]*?)\]\]>/g, "$1")
@@ -37,7 +35,6 @@ function tag(xml: string, name: string) {
 
 function classify(title: string, summary: string) {
   const text = `${title} ${summary}`.toLowerCase();
-
   const good = [
     "пада", "спад", "поевтин", "намал", "пониж", "дъмпинг", "предлагането расте",
     "производството расте", "запаси растат", "добивът расте", "ceasefire", "примирие",
@@ -48,47 +45,40 @@ function classify(title: string, summary: string) {
     "намалени запаси", "санкции", "атака", "война", "напрежение", "блокад", "прекъсване",
     "oil prices rise", "crude rises", "production cut", "supply disruption",
   ];
-
   const goodHits = good.filter((word) => text.includes(word)).length;
   const badHits = bad.filter((word) => text.includes(word)).length;
-
   if (goodHits > badHits) return "GOOD" as const;
   if (badHits > goodHits) return "BAD" as const;
   return "NEUTRAL" as const;
 }
 
 function parseFeed(xml: string, fallbackPublisher: string): NewsObservation[] {
-  const items = xml.match(/<item[\s\S]*?<\/item>/gi) ?? [];
-  const now = Date.now();
+  const items = xml.match(/<item[\\s\\S]*?<\\/item>/gi) ?? [];
+  const parsed: NewsObservation[] = [];
 
-  const parsed: Array<NewsObservation | null> = items.map((item) => {
+  for (const item of items) {
     const title = tag(item, "title");
     const url = tag(item, "link");
     const pubDate = tag(item, "pubDate");
     const summary = tag(item, "description") ?? "";
     const source = tag(item, "source") ?? fallbackPublisher;
 
-    if (!title || !url || !pubDate) return null;
-    const publishedAt = new Date(pubDate);
-    if (!Number.isFinite(publishedAt.getTime())) return null;
-    if (publishedAt.getTime() > now + 5 * 60_000) return null;
-    if (publishedAt.getTime() < now - DAY_MS) return null;
+    if (!title || !url) continue;
 
-    const observation: NewsObservation = {
+    const publishedAt = pubDate ? new Date(pubDate) : new Date();
+    if (!Number.isFinite(publishedAt.getTime())) continue;
+
+    parsed.push({
       title,
       url,
       publisher: source,
       publishedAt,
       summary: summary.slice(0, 700) || undefined,
       impact: classify(title, summary),
-    };
+    });
+  }
 
-    return observation;
-  });
-
-  return parsed
-    .filter((item): item is NewsObservation => item !== null)
-    .slice(0, 12);
+  return parsed.slice(0, 12);
 }
 
 export class NewsAdapter implements NewsCollector {
@@ -116,7 +106,10 @@ export class NewsAdapter implements NewsCollector {
           continue;
         }
 
-        all.push(...parseFeed(await response.text(), feed.publisher));
+        const xml = await response.text();
+        const parsed = parseFeed(xml, feed.publisher);
+        console.log(`News feed ${feed.publisher}: ${parsed.length} items parsed`);
+        all.push(...parsed);
       } catch (error) {
         console.warn(`News feed error for ${feed.publisher}:`, String(error));
       }
