@@ -53,7 +53,7 @@ function classify(title: string, summary: string) {
 }
 
 function parseFeed(xml: string, fallbackPublisher: string): NewsObservation[] {
-  const items = xml.match(/<item[\\s\\S]*?<\\/item>/gi) ?? [];
+  const items = xml.match(/<item[\s\S]*?<\/item>/gi) ?? [];
   const parsed: NewsObservation[] = [];
 
   for (const item of items) {
