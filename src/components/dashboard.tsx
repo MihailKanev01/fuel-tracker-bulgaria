@@ -157,4 +157,4 @@ export function Dashboard() {
     <DieselForecast fuel={fuel}/><section className="insight"><div className="signal">⌁</div><div><p className="eyebrow">ПАЗАРЕН КОНТЕКСТ</p><h3>Какво движи {label.toLowerCase()}?</h3><p>Тази секция показва проверени факти от свързани пазарни източници. Причинно-следствени изводи не се правят, докато данните не са достатъчни.</p></div><span className="pending">Очаква пазарни данни</span></section><footer>FUEL TRACKER BULGARIA <span>·</span> Цените се публикуват с източник, час и индикатор за свежест.</footer>
   </main>;
 }
-function Empty({label}:{label:string}){return <div className="empty"><span>◌</span>{label}</div>;
+function Empty({label}:{label:string}){return <div className="empty"><span>◌</span>{label}</div>;}
