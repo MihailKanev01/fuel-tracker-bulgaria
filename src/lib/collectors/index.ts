@@ -1,5 +1,6 @@
 import { FueloAdapter } from "./fuelo";
 import { KaraiAdapter } from "./karai";
+import { NewsAdapter } from "./news";
 import { PublicCsvAdapter } from "./public-csv";
 import type {
   Collector,
@@ -21,7 +22,7 @@ export function marketCollectors(): MarketCollector[] {
 }
 
 export function newsCollectors(): NewsCollector[] {
-  return [];
+  return [new NewsAdapter()];
 }
 
 export function allCollectors(): Collector[] {
