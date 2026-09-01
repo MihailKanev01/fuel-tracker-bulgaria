@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { nearbyDiesel } from "@/lib/queries";
+import { nearbyDiesel } from "@/lib/nearby";
 
 export const dynamic = "force-dynamic";
 
@@ -30,8 +30,16 @@ export async function GET(request: Request) {
     );
   }
 
-  return NextResponse.json(
-    await nearbyDiesel(lat, lon, radius, limit),
-    { headers: { "Cache-Control": "no-store" } },
-  );
+  try {
+    return NextResponse.json(
+      await nearbyDiesel(lat, lon, radius, limit),
+      { headers: { "Cache-Control": "no-store" } },
+    );
+  } catch (error) {
+    console.error("Nearby prices error:", error);
+    return NextResponse.json(
+      { error: "Unable to load nearby prices." },
+      { status: 500 },
+    );
+  }
 }
