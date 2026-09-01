@@ -24,6 +24,87 @@ function median(values: number[]) {
     : sorted[middle];
 }
 
+function stripHtml(value: string) {
+  return value
+    .replace(/<br\s*\/?\s*>/gi, " ")
+    .replace(/<[^>]+>/g, " ")
+    .replace(/&nbsp;/gi, " ")
+    .replace(/&amp;/gi, "&")
+    .replace(/&quot;/gi, '"')
+    .replace(/&#39;/gi, "'")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function parseTableRows(html: string) {
+  return [...html.matchAll(/<tr[^>]*>([\s\S]*?)<\/tr>/gi)].map((row) =>
+    [...row[1].matchAll(/<(?:th|td)[^>]*>([\s\S]*?)<\/(?:th|td)>/gi)].map((cell) => stripHtml(cell[1])),
+  ).filter((row) => row.length > 0);
+}
+
+async function liveFueloA100Overview() {
+  const sofiaNow = new Date(new Date().toLocaleString("en-US", { timeZone: "Europe/Sofia" }));
+  const dates = [0, 1, 2].map((offset) => {
+    const date = new Date(sofiaNow);
+    date.setDate(date.getDate() - offset);
+    return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
+  });
+
+  for (const date of dates) {
+    try {
+      const response = await fetch(`https://bg.fuelo.net/prices/date/${date}?lang=bg`, {
+        headers: { Accept: "text/html", "User-Agent": "FuelTrackerBG/1.0" },
+        cache: "no-store",
+        signal: AbortSignal.timeout(10_000),
+      });
+      if (!response.ok) continue;
+
+      const html = await response.text();
+      const rows = parseTableRows(html);
+      const headerIndex = rows.findIndex((row) => row.some((cell) => /^A98\+$/i.test(cell) || /A100/i.test(cell)));
+      const averageIndex = rows.findIndex((row) => /^Средна цена$/i.test(row[0] ?? "") || /^Avg price$/i.test(row[0] ?? ""));
+      if (headerIndex < 0 || averageIndex < 0) continue;
+
+      const header = rows[headerIndex];
+      const fuelColumn = header.findIndex((cell) => /^A98\+$/i.test(cell) || /A100/i.test(cell));
+      if (fuelColumn < 0) continue;
+
+      const parseCellPrice = (cell: string) => {
+        const match = cell.match(/([0-9]+(?:[.,][0-9]+)?)/);
+        if (!match) return null;
+        const value = Number(match[1].replace(",", "."));
+        return Number.isFinite(value) && value > 0 ? value : null;
+      };
+
+      const average = parseCellPrice(rows[averageIndex]?.[fuelColumn] ?? "");
+      if (average == null) continue;
+
+      const providerValues = rows
+        .slice(averageIndex + 1)
+        .filter((row) => row[0] && row[0] !== "Детайли" && row[0] !== "Details")
+        .map((row) => parseCellPrice(row[fuelColumn] ?? ""))
+        .filter((value): value is number => value != null);
+
+      const values = providerValues.length ? providerValues : [average];
+      return {
+        average,
+        lowest: Math.min(...values),
+        highest: Math.max(...values),
+        median: median(values),
+        stationCount: providerValues.length,
+        sourceCount: 1,
+        confidence: providerValues.length >= 8 ? 82 : providerValues.length >= 5 ? 78 : 70,
+        latest: new Date(`${date}T12:00:00+03:00`),
+        dataType: "MARKET_AVERAGE" as const,
+      };
+    } catch {
+      // Try the previous day's Fuelo snapshot when today's page is unavailable.
+    }
+  }
+
+  return null;
+}
+
 export async function fuelOverview(fuelType: FuelType) {
   const latestRows = await prisma.$queryRaw<
     { station_id: string; price_eur: { toNumber(): number }; observed_at: Date; confidence: number }[]
@@ -58,15 +139,7 @@ export async function fuelOverview(fuelType: FuelType) {
 
   const metricKey = fuelMetricKey(fuelType);
   const averageMetric = `fuel.${metricKey}.average`;
-
-  // Keep the market fallback deliberately simple and independent from the
-  // provider query. This mirrors the original working Diesel overview path
-  // and also works when a fuel has only a stored national average (notably A100).
-  const national = await prisma.marketDatum.findFirst({
-    where: { metric: averageMetric },
-    orderBy: { observedAt: "desc" },
-    select: { value: true, observedAt: true },
-  });
+  const national = await prisma.marketDatum.findFirst({ where: { metric: averageMetric }, orderBy: { observedAt: "desc" }, select: { value: true, observedAt: true } });
 
   const providerRows = await prisma.marketDatum.findMany({
     where: { metric: { startsWith: "provider.", endsWith: `.${metricKey}` } },
@@ -81,29 +154,43 @@ export async function fuelOverview(fuelType: FuelType) {
     latestByProvider.set(name, { value: row.value.toNumber(), observedAt: row.observedAt });
   }
 
-  const providerValues = [...latestByProvider.values()]
-    .map((row) => row.value)
-    .filter(Number.isFinite);
-
-  const average = national?.value.toNumber() ?? (providerValues.length
-    ? providerValues.reduce((sum, value) => sum + value, 0) / providerValues.length
-    : null);
-
+  const providerValues = [...latestByProvider.values()].map((row) => row.value).filter(Number.isFinite);
+  const average = national?.value.toNumber() ?? (providerValues.length ? providerValues.reduce((sum, value) => sum + value, 0) / providerValues.length : null);
   const statisticValues = providerValues.length ? providerValues : (national ? [national.value.toNumber()] : []);
-  const latest = national?.observedAt ?? [...latestByProvider.values()]
-    .map((row) => row.observedAt)
-    .sort((a, b) => b.getTime() - a.getTime())[0] ?? null;
+  const latest = national?.observedAt ?? [...latestByProvider.values()].map((row) => row.observedAt).sort((a, b) => b.getTime() - a.getTime())[0] ?? null;
+
+  if (average != null) {
+    return {
+      average,
+      lowest: statisticValues.length ? Math.min(...statisticValues) : null,
+      highest: statisticValues.length ? Math.max(...statisticValues) : null,
+      median: median(statisticValues),
+      stationCount: 0,
+      sourceCount: sources,
+      confidence: providerValues.length >= 5 ? 75 : providerValues.length >= 2 ? 70 : 60,
+      latest,
+      dataType: "MARKET_AVERAGE" as const,
+    };
+  }
+
+  // A100 is not consistently supplied as a national market metric. Fuelo's
+  // public national A98+/100 table remains a useful live fallback with
+  // provider-level observations from the same daily snapshot.
+  if (fuelType === "GASOLINE_100") {
+    const fuelo = await liveFueloA100Overview();
+    if (fuelo) return { ...fuelo, sourceCount: Math.max(1, sources) };
+  }
 
   return {
-    average,
-    lowest: statisticValues.length ? Math.min(...statisticValues) : null,
-    highest: statisticValues.length ? Math.max(...statisticValues) : null,
-    median: median(statisticValues),
+    average: null,
+    lowest: null,
+    highest: null,
+    median: null,
     stationCount: 0,
     sourceCount: sources,
-    confidence: average != null ? (providerValues.length >= 5 ? 75 : providerValues.length >= 2 ? 70 : 60) : null,
-    latest,
-    dataType: average != null ? "MARKET_AVERAGE" as const : "NO_DATA" as const,
+    confidence: null,
+    latest: null,
+    dataType: "NO_DATA" as const,
   };
 }
 
