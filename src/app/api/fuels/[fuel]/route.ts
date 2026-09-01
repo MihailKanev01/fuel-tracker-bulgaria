@@ -38,7 +38,7 @@ async function liveKaraiAverage(fuelType: FuelType) {
   const response = await fetch("https://karai.bg/api/fuel-prices", {
     headers: { Accept: "application/json", "User-Agent": "FuelTrackerBG/1.0" },
     cache: "no-store",
-    signal: AbortSignal.timeout(10_000),
+    signal: AbortSignal.timeout(8000),
   });
 
   if (!response.ok) throw new Error(`KARAI API returned ${response.status}`);
@@ -47,7 +47,7 @@ async function liveKaraiAverage(fuelType: FuelType) {
   if (value == null) throw new Error(`KARAI has no average for ${fuelType}`);
 
   const observedAt = data.fetchedAt ? new Date(data.fetchedAt) : new Date();
-  if (Number.isNaN(observedAt.getTime())) throw new Error("KARAI returned invalid fetchedAt");
+  const latest = Number.isNaN(observedAt.getTime()) ? new Date().toISOString() : observedAt.toISOString();
 
   return {
     average: value,
@@ -57,7 +57,7 @@ async function liveKaraiAverage(fuelType: FuelType) {
     stationCount: 0,
     sourceCount: 1,
     confidence: 60,
-    latest: observedAt.toISOString(),
+    latest,
     dataType: "MARKET_AVERAGE" as const,
   };
 }
@@ -66,48 +66,35 @@ export async function GET(_request: Request, context: { params: Promise<{ fuel: 
   try {
     const { fuel } = await context.params;
     const fuelType = aliases[fuel.toLowerCase()];
-    if (!fuelType) {
-      return NextResponse.json({ error: "Unsupported fuel type", fuel }, { status: 400 });
-    }
+    if (!fuelType) return NextResponse.json({ error: "Unsupported fuel type", fuel }, { status: 400 });
 
-    // The overview card must work even when Neon/Prisma is temporarily unavailable.
-    // KARAI is a lightweight live market source, so try it first.
-    try {
-      const live = await liveKaraiAverage(fuelType);
-      return NextResponse.json(live, {
-        headers: {
-          "Cache-Control": "no-store, max-age=0",
-          "X-FuelTracker-Data": "karai-live",
-        },
-      });
-    } catch (liveError) {
-      console.error(`Fuel overview live KARAI failed (${fuel}):`, liveError);
-    }
+    // Preserve the old working behavior conceptually: get the live market
+    // value from KARAI first, then fall back to persisted observations.
+    const live = await liveKaraiAverage(fuelType);
+    return NextResponse.json(live, {
+      headers: {
+        "Cache-Control": "no-store, max-age=0",
+        "X-FuelTracker-Data": "karai-live",
+      },
+    });
+  } catch (liveError) {
+    console.error("Fuel overview live source failed:", liveError);
+  }
 
-    try {
-      const result = await fuelOverview(fuelType);
-      return NextResponse.json(
-        { ...result, source: result.dataType === "STATION_PRICES" ? "fuelo-db" : "market-db" },
-        {
-          headers: {
-            "Cache-Control": "no-store, max-age=0",
-            "X-FuelTracker-Data": "neon",
-          },
-        },
-      );
-    } catch (databaseError) {
-      console.error(`Fuel overview Neon read failed (${fuel}):`, databaseError);
-    }
-
+  try {
+    const { fuel } = await context.params;
+    const fuelType = aliases[fuel.toLowerCase()];
+    if (!fuelType) return NextResponse.json({ error: "Unsupported fuel type", fuel }, { status: 400 });
+    const result = await fuelOverview(fuelType);
     return NextResponse.json(
-      { error: "Няма налична средна цена в момента.", fuel },
-      { status: 503, headers: { "Cache-Control": "no-store, max-age=0" } },
+      { ...result, source: result.dataType === "STATION_PRICES" ? "fuelo-db" : "market-db" },
+      { headers: { "Cache-Control": "no-store, max-age=0", "X-FuelTracker-Data": "neon" } },
     );
-  } catch (error) {
-    console.error("Unhandled fuel overview route error:", error);
+  } catch (databaseError) {
+    console.error("Fuel overview Neon fallback failed:", databaseError);
     return NextResponse.json(
-      { error: "Вътрешна грешка при зареждане на цената." },
-      { status: 500, headers: { "Cache-Control": "no-store, max-age=0" } },
+      { error: "Няма налична средна цена в момента." },
+      { status: 503, headers: { "Cache-Control": "no-store, max-age=0" } },
     );
   }
 }
