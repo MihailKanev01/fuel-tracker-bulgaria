@@ -21,7 +21,7 @@ export function Dashboard() {
   const [nearby, setNearby] = useState<NearbyStation[]>([]);
   const [changes, setChanges] = useState<Change[]>([]);
   const [news, setNews] = useState<NewsItem[]>([]);
-  const [radius, setRadius] = useState(25);
+  const [radius, setRadius] = useState(5);
   const [locationLoading, setLocationLoading] = useState(false);
   const [nearbyLoading, setNearbyLoading] = useState(false);
   const [locationError, setLocationError] = useState<string | null>(null);
