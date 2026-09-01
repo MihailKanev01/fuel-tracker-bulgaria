@@ -1,8 +1,6 @@
 import { NextResponse } from "next/server";
 import { FuelType } from "@prisma/client";
 import { fuelOverview } from "@/lib/queries";
-import { KaraiAdapter } from "@/lib/collectors/karai";
-import { ingestMarket } from "@/lib/ingest";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
@@ -17,33 +15,75 @@ const aliases: Record<string, FuelType> = {
   cng: "CNG",
 };
 
+const marketMetric: Record<FuelType, string> = {
+  DIESEL: "diesel",
+  GASOLINE_95: "a95",
+  GASOLINE_100: "a100",
+  LPG: "lpg",
+  CNG: "methane",
+};
+
+type KaraiResponse = {
+  fetchedAt?: string;
+  averages?: Record<string, string | number | null | undefined>;
+};
+
+function toNumber(value: string | number | null | undefined): number | null {
+  if (value == null || value === "") return null;
+  const parsed = Number(String(value).replace(",", "."));
+  return Number.isFinite(parsed) ? parsed : null;
+}
+
+async function liveKaraiAverage(fuelType: FuelType) {
+  const response = await fetch("https://karai.bg/api/fuel-prices", {
+    headers: { Accept: "application/json", "User-Agent": "FuelTrackerBG/1.0" },
+    cache: "no-store",
+    signal: AbortSignal.timeout(10_000),
+  });
+
+  if (!response.ok) throw new Error(`KARAI API returned ${response.status}`);
+  const data = (await response.json()) as KaraiResponse;
+  const value = toNumber(data.averages?.[marketMetric[fuelType]]);
+  if (value == null) throw new Error(`KARAI has no average for ${fuelType}`);
+
+  const observedAt = data.fetchedAt ? new Date(data.fetchedAt) : new Date();
+  if (Number.isNaN(observedAt.getTime())) throw new Error("KARAI returned invalid fetchedAt");
+
+  return {
+    average: value,
+    lowest: null,
+    highest: null,
+    median: null,
+    stationCount: 0,
+    sourceCount: 1,
+    confidence: 60,
+    latest: observedAt,
+    dataType: "MARKET_AVERAGE" as const,
+  };
+}
+
 export async function GET(_request: Request, context: { params: Promise<{ fuel: string }> }) {
   const { fuel } = await context.params;
   const fuelType = aliases[fuel.toLowerCase()];
   if (!fuelType) return NextResponse.json({ error: "Unsupported fuel type" }, { status: 400 });
 
   try {
-    let result = await fuelOverview(fuelType);
-
-    // Self-heal an empty production database for the overview card.
-    // KARAI provides a lightweight market average for all supported fuels.
-    if (result.average == null) {
-      try {
-        await ingestMarket(new KaraiAdapter());
-        result = await fuelOverview(fuelType);
-      } catch (seedError) {
-        console.error(`Fuel overview seed failed (${fuel}):`, seedError);
-      }
+    const result = await fuelOverview(fuelType);
+    if (result.average != null) {
+      return NextResponse.json(result, { headers: { "Cache-Control": "no-store, max-age=0" } });
     }
-
-    return NextResponse.json(result, {
-      headers: { "Cache-Control": "no-store, max-age=0" },
-    });
   } catch (error) {
-    console.error(`Fuel overview error (${fuel}):`, error);
+    console.error(`Fuel overview database read failed (${fuel}):`, error);
+  }
+
+  try {
+    const fallback = await liveKaraiAverage(fuelType);
+    return NextResponse.json(fallback, { headers: { "Cache-Control": "no-store, max-age=0" } });
+  } catch (error) {
+    console.error(`Fuel overview live fallback failed (${fuel}):`, error);
     return NextResponse.json(
-      { error: "Неуспяхме да заредим данните за горивото." },
-      { status: 500, headers: { "Cache-Control": "no-store, max-age=0" } },
+      { error: "Неуспяхме да заредим текущата средна цена." },
+      { status: 503, headers: { "Cache-Control": "no-store, max-age=0" } },
     );
   }
 }
