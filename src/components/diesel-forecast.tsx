@@ -12,9 +12,30 @@ const age = (value: string) => { const minutes = Math.max(0, Math.round((Date.no
 const confidenceLabel = { HIGH: "Висока", MEDIUM: "Средна", LOW: "Ниска" } as const;
 const directionLabel = { UP: "Очаква се ръст", DOWN: "Очаква се спад", FLAT: "Очаква се стабилност" } as const;
 
-export function DieselForecast({ fuel = "diesel" }: { fuel?: FuelKey }) {
+function readSelectedFuel(): FuelKey {
+  const button = document.querySelector<HTMLButtonElement>('.fuel-selector button[aria-pressed="true"]');
+  const label = button?.textContent?.toLowerCase() ?? "diesel";
+  if (label.includes("a100")) return "a100";
+  if (label.includes("a95")) return "a95";
+  if (label.includes("lpg")) return "lpg";
+  if (label.includes("cng")) return "cng";
+  return "diesel";
+}
+
+export function DieselForecast() {
+  const [fuel, setFuel] = useState<FuelKey>("diesel");
   const [data, setData] = useState<Forecast | null>(null);
   const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const syncFuel = () => setFuel(readSelectedFuel());
+    syncFuel();
+    const selector = document.querySelector(".fuel-selector");
+    if (!selector) return;
+    const observer = new MutationObserver(syncFuel);
+    observer.observe(selector, { subtree: true, attributes: true, attributeFilter: ["aria-pressed"] });
+    return () => observer.disconnect();
+  }, []);
 
   useEffect(() => {
     const controller = new AbortController();
