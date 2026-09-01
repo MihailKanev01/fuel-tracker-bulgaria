@@ -6,6 +6,7 @@ type FueloGasStationMarker = {
   lat: string;
   lon: string;
   logo?: string | null;
+  clusterImage?: string | null;
   cluster_count?: string | null;
 };
 
@@ -103,7 +104,6 @@ function parseInfoWindow(
   const city = locationParts[locationParts.length - 1] ?? "България";
   const address = locationParts.slice(1).join(", ") || city;
   const brand = normalizeBrand(marker.logo);
-
   const observedAt = new Date();
   const results: IncomingPrice[] = [];
 
@@ -111,10 +111,22 @@ function parseInfoWindow(
     fuel: IncomingPrice["fuel"];
     regex: RegExp;
   }> = [
-    { fuel: "DIESEL", regex: /title=["']Diesel:\s*([0-9]+(?:[.,][0-9]+)?)\s*€\/л/i },
-    { fuel: "GASOLINE_95", regex: /title=["']A95:\s*([0-9]+(?:[.,][0-9]+)?)\s*€\/л/i },
-    { fuel: "LPG", regex: /title=["']LPG:\s*([0-9]+(?:[.,][0-9]+)?)\s*€\/л/i },
-    { fuel: "CNG", regex: /title=["'](?:CNG|Methane):\s*([0-9]+(?:[.,][0-9]+)?)\s*€\/л/i },
+    {
+      fuel: "DIESEL",
+      regex: /title=["']Diesel:\s*([0-9]+(?:[.,][0-9]+)?)\s*€\/л/i,
+    },
+    {
+      fuel: "GASOLINE_95",
+      regex: /title=["']A95:\s*([0-9]+(?:[.,][0-9]+)?)\s*€\/л/i,
+    },
+    {
+      fuel: "LPG",
+      regex: /title=["']LPG:\s*([0-9]+(?:[.,][0-9]+)?)\s*€\/л/i,
+    },
+    {
+      fuel: "CNG",
+      regex: /title=["'](?:CNG|Methane):\s*([0-9]+(?:[.,][0-9]+)?)\s*€\/л/i,
+    },
   ];
 
   for (const { fuel, regex } of fuelPatterns) {
@@ -198,15 +210,46 @@ function splitBounds(bounds: Bounds): Bounds[] {
   const nextZoom = Math.min(bounds.zoom + 2, 18);
 
   return [
-    { latMin: bounds.latMin, latMax: latMid, lonMin: bounds.lonMin, lonMax: lonMid, zoom: nextZoom, depth: nextDepth },
-    { latMin: bounds.latMin, latMax: latMid, lonMin: lonMid, lonMax: bounds.lonMax, zoom: nextZoom, depth: nextDepth },
-    { latMin: latMid, latMax: bounds.latMax, lonMin: bounds.lonMin, lonMax: lonMid, zoom: nextZoom, depth: nextDepth },
-    { latMin: latMid, latMax: bounds.latMax, lonMin: lonMid, lonMax: bounds.lonMax, zoom: nextZoom, depth: nextDepth },
+    {
+      latMin: bounds.latMin,
+      latMax: latMid,
+      lonMin: bounds.lonMin,
+      lonMax: lonMid,
+      zoom: nextZoom,
+      depth: nextDepth,
+    },
+    {
+      latMin: bounds.latMin,
+      latMax: latMid,
+      lonMin: lonMid,
+      lonMax: bounds.lonMax,
+      zoom: nextZoom,
+      depth: nextDepth,
+    },
+    {
+      latMin: latMid,
+      latMax: bounds.latMax,
+      lonMin: bounds.lonMin,
+      lonMax: lonMid,
+      zoom: nextZoom,
+      depth: nextDepth,
+    },
+    {
+      latMin: latMid,
+      latMax: bounds.latMax,
+      lonMin: lonMid,
+      lonMax: bounds.lonMax,
+      zoom: nextZoom,
+      depth: nextDepth,
+    },
   ];
 }
 
 async function discoverStations(maxDepth: number): Promise<FueloGasStationMarker[]> {
-  const queue: Bounds[] = [{ ...BULGARIA_BOUNDS, depth: 0 }];
+  // A whole-country request can return status=warning. Start with smaller
+  // cells, similar to how the browser progressively loads the map.
+  const root: Bounds = { ...BULGARIA_BOUNDS, depth: 0 };
+  const queue: Bounds[] = splitBounds(root);
   const unique = new Map<string, FueloGasStationMarker>();
 
   while (queue.length) {
@@ -214,17 +257,17 @@ async function discoverStations(maxDepth: number): Promise<FueloGasStationMarker
     const markers = await fetchBounds(current);
 
     for (const marker of markers) {
-      const clusterCount = Number(marker.cluster_count ?? 1);
-
       if (marker.id) {
         unique.set(marker.id, marker);
       }
+    }
 
-      if (!Number.isFinite(clusterCount) || clusterCount <= 1) continue;
-      if (current.depth >= maxDepth) continue;
+    const hasClusters = markers.some(
+      (marker) => Number(marker.cluster_count ?? 1) > 1,
+    );
 
+    if (hasClusters && current.depth < maxDepth) {
       queue.push(...splitBounds(current));
-      break;
     }
 
     if (queue.length) await sleep(150);
@@ -252,7 +295,9 @@ async function fetchStationPrices(
 
       try {
         const url = `${INFO_URL}/${encodeURIComponent(marker.id)}?lang=bg`;
-        const info = await fetchJson<FueloInfoResponse>(url, { method: "GET" });
+        const info = await fetchJson<FueloInfoResponse>(url, {
+          method: "GET",
+        });
         results.push(...parseInfoWindow(marker, info));
       } catch (error) {
         console.warn(`Fuelo station ${marker.id} failed:`, error);
@@ -263,7 +308,10 @@ async function fetchStationPrices(
   }
 
   await Promise.all(
-    Array.from({ length: Math.min(concurrency, selected.length) }, () => worker()),
+    Array.from(
+      { length: Math.min(concurrency, selected.length) },
+      () => worker(),
+    ),
   );
 
   return results;
@@ -280,12 +328,20 @@ export class FueloAdapter implements PriceCollector {
     const detailLimit = Number(process.env.FUELO_DETAIL_LIMIT ?? 250);
     const concurrency = Number(process.env.FUELO_CONCURRENCY ?? 5);
 
-    if (!Number.isInteger(maxDepth) || maxDepth < 0 || maxDepth > 5) {
-      throw new Error("FUELO_DISCOVERY_DEPTH must be an integer between 0 and 5");
+    if (!Number.isInteger(maxDepth) || maxDepth < 1 || maxDepth > 5) {
+      throw new Error(
+        "FUELO_DISCOVERY_DEPTH must be an integer between 1 and 5",
+      );
     }
 
-    if (!Number.isInteger(detailLimit) || detailLimit < 1 || detailLimit > 500) {
-      throw new Error("FUELO_DETAIL_LIMIT must be an integer between 1 and 500");
+    if (
+      !Number.isInteger(detailLimit) ||
+      detailLimit < 1 ||
+      detailLimit > 500
+    ) {
+      throw new Error(
+        "FUELO_DETAIL_LIMIT must be an integer between 1 and 500",
+      );
     }
 
     if (!Number.isInteger(concurrency) || concurrency < 1 || concurrency > 10) {
