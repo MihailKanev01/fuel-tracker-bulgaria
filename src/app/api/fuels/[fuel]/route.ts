@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server";
 import { FuelType } from "@prisma/client";
 import { fuelOverview } from "@/lib/queries";
+import { KaraiAdapter } from "@/lib/collectors/karai";
+import { ingestMarket } from "@/lib/ingest";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
@@ -21,7 +23,19 @@ export async function GET(_request: Request, context: { params: Promise<{ fuel: 
   if (!fuelType) return NextResponse.json({ error: "Unsupported fuel type" }, { status: 400 });
 
   try {
-    const result = await fuelOverview(fuelType);
+    let result = await fuelOverview(fuelType);
+
+    // Self-heal an empty production database for the overview card.
+    // KARAI provides a lightweight market average for all supported fuels.
+    if (result.average == null) {
+      try {
+        await ingestMarket(new KaraiAdapter());
+        result = await fuelOverview(fuelType);
+      } catch (seedError) {
+        console.error(`Fuel overview seed failed (${fuel}):`, seedError);
+      }
+    }
+
     return NextResponse.json(result, {
       headers: { "Cache-Control": "no-store, max-age=0" },
     });
