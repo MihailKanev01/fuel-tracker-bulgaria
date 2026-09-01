@@ -52,6 +52,15 @@ function toNumber(value: string | number | null | undefined): number | null {
   return Number.isFinite(parsed) ? parsed : null;
 }
 
+function median(values: number[]) {
+  if (!values.length) return null;
+  const sorted = [...values].sort((a, b) => a - b);
+  const middle = Math.floor(sorted.length / 2);
+  return sorted.length % 2 === 0
+    ? (sorted[middle - 1] + sorted[middle]) / 2
+    : sorted[middle];
+}
+
 async function liveKaraiAverage(fuelType: FuelType) {
   const response = await fetch("https://karai.bg/api/fuel-prices", {
     headers: { Accept: "application/json", "User-Agent": "FuelTrackerBG/1.0" },
@@ -64,16 +73,16 @@ async function liveKaraiAverage(fuelType: FuelType) {
   const metricKey = marketMetric[fuelType];
 
   let value = toNumber(data.averages?.[metricKey]);
+  let providerValues: number[] = [];
 
-  // KARAI publishes the common fuels in averages, but premium A100 may only
-  // be present at provider level. Aggregate those provider observations when
-  // the national average is unavailable.
-  if (value == null && data.providers?.length) {
-    const providerValues = data.providers
+  if (data.providers?.length) {
+    providerValues = data.providers
       .map((provider) => toNumber(provider[metricKey as keyof KaraiProvider] as string | number | null | undefined))
       .filter((item): item is number => item != null);
 
-    if (providerValues.length) {
+    // A100 can be missing from the national average while still being
+    // available for individual providers.
+    if (value == null && providerValues.length) {
       value = providerValues.reduce((sum, item) => sum + item, 0) / providerValues.length;
     }
   }
@@ -85,12 +94,12 @@ async function liveKaraiAverage(fuelType: FuelType) {
 
   return {
     average: value,
-    lowest: null,
-    highest: null,
-    median: null,
-    stationCount: 0,
+    lowest: providerValues.length ? Math.min(...providerValues) : null,
+    highest: providerValues.length ? Math.max(...providerValues) : null,
+    median: median(providerValues),
+    stationCount: providerValues.length,
     sourceCount: 1,
-    confidence: 60,
+    confidence: providerValues.length >= 5 ? 75 : providerValues.length >= 3 ? 70 : 60,
     latest,
     dataType: "MARKET_AVERAGE" as const,
   };
@@ -102,13 +111,16 @@ export async function GET(_request: Request, context: { params: Promise<{ fuel: 
     const fuelType = aliases[fuel.toLowerCase()];
     if (!fuelType) return NextResponse.json({ error: "Unsupported fuel type", fuel }, { status: 400 });
 
-    // Keep the proven database path first. Fuelo station observations are the
-    // best source for station-level statistics and work for every fuel type.
+    // Prefer persisted Fuelo station data when available because it gives us
+    // the true station-level low/high/median values. If only a stored market
+    // average exists, enrich it with live KARAI provider observations so the
+    // statistics cards are populated instead of showing dashes.
+    let persisted: Awaited<ReturnType<typeof fuelOverview>> | null = null;
     try {
-      const persisted = await fuelOverview(fuelType);
-      if (persisted.average != null) {
+      persisted = await fuelOverview(fuelType);
+      if (persisted.average != null && persisted.dataType === "STATION_PRICES") {
         return NextResponse.json(
-          { ...persisted, source: persisted.dataType === "STATION_PRICES" ? "fuelo-db" : "market-db" },
+          { ...persisted, source: "fuelo-db" },
           { headers: { "Cache-Control": "no-store, max-age=0", "X-FuelTracker-Data": "neon" } },
         );
       }
@@ -126,6 +138,13 @@ export async function GET(_request: Request, context: { params: Promise<{ fuel: 
       });
     } catch (liveError) {
       console.error(`Fuel overview live KARAI failed (${fuel}):`, liveError);
+    }
+
+    if (persisted?.average != null) {
+      return NextResponse.json(
+        { ...persisted, source: "market-db" },
+        { headers: { "Cache-Control": "no-store, max-age=0", "X-FuelTracker-Data": "neon" } },
+      );
     }
 
     return NextResponse.json(
