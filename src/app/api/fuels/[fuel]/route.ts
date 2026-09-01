@@ -57,7 +57,7 @@ async function liveKaraiAverage(fuelType: FuelType) {
     stationCount: 0,
     sourceCount: 1,
     confidence: 60,
-    latest: observedAt,
+    latest: observedAt.toISOString(),
     dataType: "MARKET_AVERAGE" as const,
   };
 }
@@ -67,23 +67,37 @@ export async function GET(_request: Request, context: { params: Promise<{ fuel: 
   const fuelType = aliases[fuel.toLowerCase()];
   if (!fuelType) return NextResponse.json({ error: "Unsupported fuel type" }, { status: 400 });
 
+  // The overview must always have a live market fallback. Query the lightweight
+  // market source first so a temporary Neon/Prisma problem cannot blank the card.
+  try {
+    const live = await liveKaraiAverage(fuelType);
+    return NextResponse.json(live, {
+      headers: {
+        "Cache-Control": "no-store, max-age=0",
+        "X-FuelTracker-Data": "karai-live",
+      },
+    });
+  } catch (liveError) {
+    console.error(`Fuel overview live KARAI failed (${fuel}):`, liveError);
+  }
+
+  // Fall back to stored observations if the live source is temporarily unavailable.
   try {
     const result = await fuelOverview(fuelType);
     if (result.average != null) {
-      return NextResponse.json(result, { headers: { "Cache-Control": "no-store, max-age=0" } });
+      return NextResponse.json(result, {
+        headers: {
+          "Cache-Control": "no-store, max-age=0",
+          "X-FuelTracker-Data": "neon",
+        },
+      });
     }
-  } catch (error) {
-    console.error(`Fuel overview database read failed (${fuel}):`, error);
+  } catch (databaseError) {
+    console.error(`Fuel overview Neon read failed (${fuel}):`, databaseError);
   }
 
-  try {
-    const fallback = await liveKaraiAverage(fuelType);
-    return NextResponse.json(fallback, { headers: { "Cache-Control": "no-store, max-age=0" } });
-  } catch (error) {
-    console.error(`Fuel overview live fallback failed (${fuel}):`, error);
-    return NextResponse.json(
-      { error: "Неуспяхме да заредим текущата средна цена." },
-      { status: 503, headers: { "Cache-Control": "no-store, max-age=0" } },
-    );
-  }
+  return NextResponse.json(
+    { error: "Няма налична средна цена в момента." },
+    { status: 503, headers: { "Cache-Control": "no-store, max-age=0" } },
+  );
 }
