@@ -8,6 +8,7 @@ type Point = { date: string; average: number; minimum: number; maximum: number }
 type Station = { id: string; name: string; brand: string | null; city: string; address: string; price: number; observedAt: string; confidence: number; sourceUrl: string; latitude: number | null; longitude: number | null };
 type NearbyStation = Station & { distanceKm: number };
 type Change = { id: string; station: string; city: string; oldPrice: number; newPrice: number; change: number; percent: number; detectedAt: string; sourceUrl: string };
+type NewsItem = { id: string; title: string; url: string; publisher: string; publishedAt: string; summary: string | null; impact: "GOOD" | "BAD" | "NEUTRAL" | null };
 
 const fmt = new Intl.NumberFormat("bg-BG", { style: "currency", currency: "EUR", minimumFractionDigits: 3 });
 const age = (value: string | null) => { if (!value) return "Няма данни"; const date = new Date(value); if (Number.isNaN(date.getTime())) return "Няма данни"; const minutes = Math.max(0, Math.round((Date.now() - date.getTime()) / 60_000)); return minutes < 60 ? `преди ${minutes} мин` : minutes < 1440 ? `преди ${Math.round(minutes / 60)} ч` : `преди ${Math.round(minutes / 1440)} дни`; };
@@ -19,6 +20,7 @@ export function Dashboard() {
   const [stations, setStations] = useState<Station[]>([]);
   const [nearby, setNearby] = useState<NearbyStation[]>([]);
   const [changes, setChanges] = useState<Change[]>([]);
+  const [news, setNews] = useState<NewsItem[]>([]);
   const [radius, setRadius] = useState(25);
   const [locationLoading, setLocationLoading] = useState(false);
   const [nearbyLoading, setNearbyLoading] = useState(false);
@@ -33,11 +35,13 @@ export function Dashboard() {
       fetch(`/api/fuels/diesel/history?days=${period}`).then((r) => r.json()),
       fetch("/api/prices/cheapest?limit=5").then((r) => r.json()),
       fetch("/api/prices/changes").then((r) => r.json()),
-    ]).then(([a, b, c, d]) => {
+      fetch("/api/news").then((r) => r.json()),
+    ]).then(([a, b, c, d, e]) => {
       setOverview(a);
       setHistory(b);
       setStations(c);
       setChanges(d);
+      setNews(Array.isArray(e) ? e : []);
     }).catch((error) => console.error("Dashboard loading error:", error)).finally(() => setLoading(false));
   }, [period]);
 
@@ -47,7 +51,6 @@ export function Dashboard() {
       setLocationError("Браузърът не поддържа геолокация.");
       return;
     }
-
     setLocationLoading(true);
     navigator.geolocation.getCurrentPosition(
       (position) => {
@@ -72,9 +75,7 @@ export function Dashboard() {
         if (!r.ok) throw new Error("Неуспешно зареждане на близките станции");
         return r.json();
       })
-      .then((data) => {
-        setNearby(Array.isArray(data) ? data : []);
-      })
+      .then((data) => setNearby(Array.isArray(data) ? data : []))
       .catch((error) => {
         if (error.name !== "AbortError") setLocationError("Неуспяхме да заредим близките станции.");
       })
@@ -90,28 +91,29 @@ export function Dashboard() {
     return { value: last - first, percent: ((last - first) / first) * 100 };
   }, [history]);
 
-  const hasData = overview?.average != null;
+  const marketSignal = useMemo(() => {
+    const good = news.filter((item) => item.impact === "GOOD").length;
+    const bad = news.filter((item) => item.impact === "BAD").length;
+    if (!news.length) return { label: "Няма достатъчно новини", tone: "neutral" as const };
+    if (bad > good) return { label: "По-скоро натиск за поскъпване", tone: "bad" as const };
+    if (good > bad) return { label: "По-скоро натиск за поевтиняване", tone: "good" as const };
+    return { label: "Смесени пазарни сигнали", tone: "neutral" as const };
+  }, [news]);
 
+  const goodNews = news.filter((item) => item.impact === "GOOD").slice(0, 3);
+  const badNews = news.filter((item) => item.impact === "BAD").slice(0, 3);
+  const neutralNews = news.filter((item) => item.impact === "NEUTRAL" || !item.impact).slice(0, 2);
+  const hasData = overview?.average != null;
   const useLocation = () => {
     setLocationError(null);
-    if (!("geolocation" in navigator)) {
-      setLocationError("Браузърът не поддържа геолокация.");
-      return;
-    }
+    if (!("geolocation" in navigator)) { setLocationError("Браузърът не поддържа геолокация."); return; }
     setLocationLoading(true);
     navigator.geolocation.getCurrentPosition(
-      (position) => {
-        setCoords({ lat: position.coords.latitude, lon: position.coords.longitude });
-        setLocationLoading(false);
-      },
-      () => {
-        setLocationLoading(false);
-        setLocationError("Няма разрешение за местоположение. Разреши Location в браузъра и опитай отново.");
-      },
+      (position) => { setCoords({ lat: position.coords.latitude, lon: position.coords.longitude }); setLocationLoading(false); },
+      () => { setLocationLoading(false); setLocationError("Няма разрешение за местоположение. Разреши Location в браузъра и опитай отново."); },
       { enableHighAccuracy: true, timeout: 10000, maximumAge: 300000 },
     );
   };
-
   const shownStations = coords ? nearby : [];
 
   return <main className="shell">
@@ -131,10 +133,16 @@ export function Dashboard() {
       {!coords && !locationLoading && !locationError ? <div className="empty">◌ Разреши местоположението си, за да покажем най-евтиния дизел около теб.</div> : null}
       {coords && !nearbyLoading && nearby.length === 0 && !locationError ? <div className="empty">◌ Няма станции с валидна цена в радиус {radius} km.</div> : null}
       <LocationMap latitude={coords?.lat ?? null} longitude={coords?.lon ?? null} radiusKm={radius} stations={shownStations}/></article>
-      <article className="panel" id="changes"><PanelTitle label="ПОСЛЕДНИ ПРОМЕНИ" action="Цял журнал →"/><div className="change-list">{changes.length ? changes.slice(0,5).map((change) => <a key={change.id} className="change" href={change.sourceUrl} target="_blank" rel="noreferrer"><div className={change.change >= 0 ? "arrow rise" : "arrow fall"}>{change.change >= 0 ? "↑" : "↓"}</div><div><strong>{change.station} <span>· {change.city}</span></strong><small>{fmt.format(change.oldPrice)} → {fmt.format(change.newPrice)} · {age(change.detectedAt)}</small></div><b className={change.change >= 0 ? "rise" : "fall"}>{change.change >= 0 ? "+" : ""}{fmt.format(change.change)}</b></a>) : <Empty label="Ще се появят при първата открита промяна."/>}</div></article></section>
-    <section className="insight" id="market"><div className="signal">⌁</div><div><p className="eyebrow">ПАЗАРЕН КОНТЕКСТ</p><h3>Какво движи дизела?</h3><p>Тази секция показва проверени факти от свързани пазарни източници. Причинно-следствени изводи не се правят, докато данните не са достатъчни.</p></div><span className="pending">Пазарни данни активни</span></section>
+      <article className="panel" id="changes"><div className="panel-title"><div><h3>ПОСЛЕДНИ ПРОМЕНИ</h3><small style={{ opacity: 0.7 }}>{marketSignal.label}</small></div><a href="#market">Пазар →</a></div>
+        {changes.length ? <div className="change-list">{changes.slice(0,3).map((change) => <a key={change.id} className="change" href={change.sourceUrl} target="_blank" rel="noreferrer"><div className={change.change >= 0 ? "arrow rise" : "arrow fall"}>{change.change >= 0 ? "↑" : "↓"}</div><div><strong>{change.station} <span>· {change.city}</span></strong><small>{fmt.format(change.oldPrice)} → {fmt.format(change.newPrice)} · {age(change.detectedAt)}</small></div><b className={change.change >= 0 ? "rise" : "fall"}>{change.change >= 0 ? "+" : ""}{fmt.format(change.change)}</b></a>)}</div> : null}
+        {news.length ? <div className="news-summary">
+          {goodNews.length ? <div className="news-group"><div className="news-label rise">🟢 ДОБРИ НОВИНИ</div>{goodNews.map((item) => <a className="news-item" key={item.id} href={item.url} target="_blank" rel="noreferrer"><strong>{item.title}</strong><span>{item.publisher} · {age(item.publishedAt)}</span></a>)}</div> : null}
+          {badNews.length ? <div className="news-group"><div className="news-label fall">🔴 ЛОШИ НОВИНИ</div>{badNews.map((item) => <a className="news-item" key={item.id} href={item.url} target="_blank" rel="noreferrer"><strong>{item.title}</strong><span>{item.publisher} · {age(item.publishedAt)}</span></a>)}</div> : null}
+          {!goodNews.length && !badNews.length && neutralNews.length ? <div className="news-group"><div className="news-label">⚪ НЕУТРАЛНО</div>{neutralNews.map((item) => <a className="news-item" key={item.id} href={item.url} target="_blank" rel="noreferrer"><strong>{item.title}</strong><span>{item.publisher} · {age(item.publishedAt)}</span></a>)}</div> : null}
+        </div> : <Empty label="Все още няма събрани новини за пазара на горива."/>}
+      </article></section>
+    <section className="insight" id="market"><div className="signal">⌁</div><div><p className="eyebrow">ПАЗАРЕН КОНТЕКСТ</p><h3>{marketSignal.label}</h3><p>Обобщението се базира на последните събрани пазарни новини и наблюдаваните промени в цените. То показва посоката на сигналите, а не доказва причинно-следствена връзка.</p></div><span className="pending">{news.length ? `${news.length} новини` : "Очаква новини"}</span></section>
     <footer>FUEL TRACKER BULGARIA <span>·</span> Цените се публикуват с източник, час и индикатор за свежест.</footer>
   </main>;
 }
-function PanelTitle({ label, action }: { label: string; action: string }) { return <div className="panel-title"><h3>{label}</h3><a href="#">{action}</a></div>; }
 function Empty({ label }: { label: string }) { return <div className="empty"><span>◌</span>{label}</div>; }
