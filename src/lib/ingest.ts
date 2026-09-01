@@ -6,11 +6,11 @@ import type { MarketCollector, MarketObservation, PriceCollector } from "@/lib/c
 export async function ingest(adapter: PriceCollector) {
   const source = await prisma.source.upsert({
     where: { name: adapter.name },
-    update: { baseUrl: adapter.baseUrl, kind: "API", lastAttemptAt: new Date() },
+    update: { baseUrl: adapter.baseUrl, kind: adapter.sourceKind as SourceKind, lastAttemptAt: new Date() },
     create: {
       name: adapter.name,
       baseUrl: adapter.baseUrl,
-      kind: "API",
+      kind: adapter.sourceKind as SourceKind,
       status: "ONLINE",
       lastAttemptAt: new Date(),
     },
@@ -61,11 +61,11 @@ export async function ingest(adapter: PriceCollector) {
 export async function ingestMarket(adapter: MarketCollector) {
   const source = await prisma.source.upsert({
     where: { name: adapter.name },
-    update: { baseUrl: adapter.baseUrl, kind: SourceKind.API, lastAttemptAt: new Date() },
+    update: { baseUrl: adapter.baseUrl, kind: adapter.sourceKind as SourceKind, lastAttemptAt: new Date() },
     create: {
       name: adapter.name,
       baseUrl: adapter.baseUrl,
-      kind: SourceKind.API,
+      kind: adapter.sourceKind as SourceKind,
       status: "ONLINE",
       lastAttemptAt: new Date(),
     },
