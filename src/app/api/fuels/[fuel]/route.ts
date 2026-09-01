@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { fuelOverview } from "@/lib/queries";
+import { dieselOverviewLegacy } from "@/lib/diesel-legacy";
 import type { FuelType } from "@prisma/client";
 
 export const dynamic = "force-dynamic";
@@ -80,8 +81,6 @@ async function liveKaraiAverage(fuelType: FuelType) {
       .map((provider) => toNumber(provider[metricKey as keyof KaraiProvider] as string | number | null | undefined))
       .filter((item): item is number => item != null);
 
-    // A100 can be missing from the national average while still being
-    // available for individual providers.
     if (value == null && providerValues.length) {
       value = providerValues.reduce((sum, item) => sum + item, 0) / providerValues.length;
     }
@@ -111,10 +110,16 @@ export async function GET(_request: Request, context: { params: Promise<{ fuel: 
     const fuelType = aliases[fuel.toLowerCase()];
     if (!fuelType) return NextResponse.json({ error: "Unsupported fuel type", fuel }, { status: 400 });
 
-    // Prefer persisted Fuelo station data when available because it gives us
-    // the true station-level low/high/median values. If only a stored market
-    // average exists, enrich it with live KARAI provider observations so the
-    // statistics cards are populated instead of showing dashes.
+    // Diesel keeps the exact station-level overview path used before
+    // multi-fuel support was introduced. Other fuels use the generic route.
+    if (fuelType === "DIESEL") {
+      const diesel = await dieselOverviewLegacy();
+      return NextResponse.json(
+        { ...diesel, source: "fuelo-db" },
+        { headers: { "Cache-Control": "no-store, max-age=0", "X-FuelTracker-Data": "neon-legacy-diesel" } },
+      );
+    }
+
     let persisted: Awaited<ReturnType<typeof fuelOverview>> | null = null;
     try {
       persisted = await fuelOverview(fuelType);
