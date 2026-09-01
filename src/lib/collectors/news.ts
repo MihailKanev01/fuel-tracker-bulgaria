@@ -58,26 +58,29 @@ function classify(title: string, summary: string) {
 function parseFeed(xml: string, publisher: string): NewsObservation[] {
   const items = xml.match(/<item[\s\S]*?<\/item>/gi) ?? [];
 
-  return items
-    .map((item) => {
-      const title = tag(item, "title");
-      const url = tag(item, "link");
-      const pubDate = tag(item, "pubDate");
-      const summary = tag(item, "description") ?? "";
+  const parsed: Array<NewsObservation | null> = items.map((item) => {
+    const title = tag(item, "title");
+    const url = tag(item, "link");
+    const pubDate = tag(item, "pubDate");
+    const summary = tag(item, "description") ?? "";
 
-      if (!title || !url || !pubDate) return null;
-      const publishedAt = new Date(pubDate);
-      if (!Number.isFinite(publishedAt.getTime())) return null;
+    if (!title || !url || !pubDate) return null;
+    const publishedAt = new Date(pubDate);
+    if (!Number.isFinite(publishedAt.getTime())) return null;
 
-      return {
-        title,
-        url,
-        publisher,
-        publishedAt,
-        summary: summary.slice(0, 700) || undefined,
-        impact: classify(title, summary),
-      } satisfies NewsObservation;
-    })
+    const observation: NewsObservation = {
+      title,
+      url,
+      publisher,
+      publishedAt,
+      summary: summary.slice(0, 700) || undefined,
+      impact: classify(title, summary),
+    };
+
+    return observation;
+  });
+
+  return parsed
     .filter((item): item is NewsObservation => item !== null)
     .slice(0, 12);
 }
