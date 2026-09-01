@@ -8,24 +8,9 @@ type Marker = {
   cluster_count?: string | null;
 };
 
-type BoundsResponse = {
-  status: string;
-  gasstations?: Marker[];
-};
-
-type InfoResponse = {
-  status: string;
-  text?: string;
-};
-
-type Bounds = {
-  latMin: number;
-  latMax: number;
-  lonMin: number;
-  lonMax: number;
-  zoom: number;
-  depth: number;
-};
+type BoundsResponse = { status: string; gasstations?: Marker[] };
+type InfoResponse = { status: string; text?: string };
+type Bounds = { latMin: number; latMax: number; lonMin: number; lonMax: number; zoom: number; depth: number };
 
 const MAP_URL = "https://bg.fuelo.net/ajax/get_gasstations_within_bounds_mysql_clustering";
 const INFO_URL = "https://bg.fuelo.net/ajax/get_infowindow_content";
@@ -54,7 +39,7 @@ function normalizeText(value: string) {
     .replace(/&amp;/g, "&")
     .replace(/&quot;/g, '"')
     .replace(/&#39;/g, "'")
-    .replace(/\\s+/g, " ")
+    .replace(/\s+/g, " ")
     .trim();
 }
 
@@ -89,14 +74,14 @@ async function fetchJson<T>(url: string, init?: RequestInit): Promise<T> {
       ...(init?.headers ?? {}),
     },
     cache: "no-store",
-    signal: AbortSignal.timeout(12_000),
+    signal: AbortSignal.timeout(12000),
   });
   if (!response.ok) throw new Error(`Fuelo returned ${response.status}`);
   return (await response.json()) as T;
 }
 
 async function fetchBounds(bounds: Bounds) {
-  const body = new URLSearchParams({
+  const form = new URLSearchParams({
     lat_max: String(bounds.latMax),
     lon_max: String(bounds.lonMax),
     lat_min: String(bounds.latMin),
@@ -109,7 +94,7 @@ async function fetchBounds(bounds: Bounds) {
   return fetchJson<BoundsResponse>(MAP_URL, {
     method: "POST",
     headers: { "Content-Type": "application/x-www-form-urlencoded; charset=UTF-8" },
-    body,
+    body: form,
   });
 }
 
@@ -156,16 +141,9 @@ async function discoverNearbyMarkers(latitude: number, longitude: number, radius
   }
 
   return [...unique.values()]
-    .map((marker) => ({
-      marker,
-      latitude: toNumber(marker.lat),
-      longitude: toNumber(marker.lon),
-    }))
+    .map((marker) => ({ marker, latitude: toNumber(marker.lat), longitude: toNumber(marker.lon) }))
     .filter((item) => item.latitude != null && item.longitude != null)
-    .map((item) => ({
-      ...item,
-      distanceKm: distanceKm(latitude, longitude, item.latitude!, item.longitude!),
-    }))
+    .map((item) => ({ ...item, distanceKm: distanceKm(latitude, longitude, item.latitude!, item.longitude!) }))
     .filter((item) => item.distanceKm <= radiusKm)
     .sort((a, b) => a.distanceKm - b.distanceKm);
 }
@@ -190,7 +168,6 @@ export async function liveNearbyDiesel(
       try {
         const info = await fetchJson<InfoResponse>(`${INFO_URL}/${encodeURIComponent(item.marker.id)}?lang=bg`);
         if (info.status !== "OK" || !info.text) continue;
-
         const name = textBetween(info.text, "h4");
         const location = textBetween(info.text, "h5");
         const priceMatch = info.text.match(/title=["']Diesel:\s*([0-9]+(?:[.,][0-9]+)?)\s*€\/л/i);
@@ -213,7 +190,7 @@ export async function liveNearbyDiesel(
           distanceKm: Number(item.distanceKm.toFixed(2)),
         });
       } catch {
-        // One failed station should not break the whole nearby query.
+        // One failed station must not break the complete nearby result set.
       }
     }
   }
