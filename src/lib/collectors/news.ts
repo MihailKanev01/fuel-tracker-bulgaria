@@ -15,6 +15,8 @@ const FEEDS = [
   },
 ];
 
+const DAY_MS = 86_400_000;
+
 function decode(value: string) {
   return value
     .replace(/<!\[CDATA\[([\s\S]*?)\]\]>/g, "$1")
@@ -55,23 +57,27 @@ function classify(title: string, summary: string) {
   return "NEUTRAL" as const;
 }
 
-function parseFeed(xml: string, publisher: string): NewsObservation[] {
+function parseFeed(xml: string, fallbackPublisher: string): NewsObservation[] {
   const items = xml.match(/<item[\s\S]*?<\/item>/gi) ?? [];
+  const now = Date.now();
 
   const parsed: Array<NewsObservation | null> = items.map((item) => {
     const title = tag(item, "title");
     const url = tag(item, "link");
     const pubDate = tag(item, "pubDate");
     const summary = tag(item, "description") ?? "";
+    const source = tag(item, "source") ?? fallbackPublisher;
 
     if (!title || !url || !pubDate) return null;
     const publishedAt = new Date(pubDate);
     if (!Number.isFinite(publishedAt.getTime())) return null;
+    if (publishedAt.getTime() > now + 5 * 60_000) return null;
+    if (publishedAt.getTime() < now - DAY_MS) return null;
 
     const observation: NewsObservation = {
       title,
       url,
-      publisher,
+      publisher: source,
       publishedAt,
       summary: summary.slice(0, 700) || undefined,
       impact: classify(title, summary),
