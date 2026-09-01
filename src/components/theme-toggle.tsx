@@ -14,6 +14,24 @@ export function ThemeToggle() {
     document.documentElement.dataset.theme = next;
   }, []);
 
+  useEffect(() => {
+    let cancelled = false;
+
+    const startLocation = () => {
+      if (cancelled || !("geolocation" in navigator)) return;
+      const button = document.querySelector<HTMLButtonElement>("#cheapest .panel-title > button");
+      if (!button) return;
+      button.style.display = "none";
+      if (!button.disabled) button.click();
+    };
+
+    const timer = window.setTimeout(startLocation, 0);
+    return () => {
+      cancelled = true;
+      window.clearTimeout(timer);
+    };
+  }, []);
+
   const toggle = () => {
     const next: Theme = theme === "dark" ? "light" : "dark";
     setTheme(next);
