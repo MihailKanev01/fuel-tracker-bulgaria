@@ -3,6 +3,7 @@ import { FuelType } from "@prisma/client";
 import { cheapestFuel } from "@/lib/queries";
 
 export const dynamic = "force-dynamic";
+export const revalidate = 0;
 
 const aliases: Record<string, FuelType> = {
   diesel: "DIESEL",
@@ -17,5 +18,11 @@ export async function GET(request: Request) {
   const fuel = aliases[(searchParams.get("fuel") ?? "diesel").toLowerCase()];
   if (!fuel) return NextResponse.json({ error: "Unsupported fuel type" }, { status: 400 });
   const limit = Math.min(100, Math.max(1, Number(searchParams.get("limit") ?? 10)));
-  return NextResponse.json(await cheapestFuel(fuel, limit, searchParams.get("city") ?? undefined));
+  try {
+    const result = await cheapestFuel(fuel, limit, searchParams.get("city") ?? undefined);
+    return NextResponse.json(result, { headers: { "Cache-Control": "no-store, max-age=0" } });
+  } catch (error) {
+    console.error(`Cheapest fuel error (${fuel}):`, error);
+    return NextResponse.json({ error: "Неуспяхме да заредим цените." }, { status: 500, headers: { "Cache-Control": "no-store, max-age=0" } });
+  }
 }
