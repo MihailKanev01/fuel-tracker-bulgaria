@@ -16,18 +16,30 @@ export function ThemeToggle() {
 
   useEffect(() => {
     let cancelled = false;
+    let observer: MutationObserver | null = null;
+    let timer = 0;
 
     const startLocation = () => {
-      if (cancelled || !("geolocation" in navigator)) return;
+      if (cancelled || !("geolocation" in navigator)) return true;
       const button = document.querySelector<HTMLButtonElement>("#cheapest .panel-title > button");
-      if (!button) return;
+      if (!button) return false;
       button.style.display = "none";
       if (!button.disabled) button.click();
+      return true;
     };
 
-    const timer = window.setTimeout(startLocation, 0);
+    const initialized = startLocation();
+    if (!initialized) {
+      observer = new MutationObserver(() => {
+        if (startLocation()) observer?.disconnect();
+      });
+      observer.observe(document.body, { childList: true, subtree: true });
+      timer = window.setTimeout(() => observer?.disconnect(), 5000);
+    }
+
     return () => {
       cancelled = true;
+      observer?.disconnect();
       window.clearTimeout(timer);
     };
   }, []);
