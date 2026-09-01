@@ -1,0 +1,2 @@
+FuelTracker BG deployment marker
+Fuel selector: Diesel, A95, A100, LPG, CNG
