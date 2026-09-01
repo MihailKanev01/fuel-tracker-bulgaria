@@ -1,5 +1,20 @@
 import { prisma } from "@/lib/prisma";
 
+export type NearbyDieselStation = {
+  id: string;
+  name: string;
+  brand: string | null;
+  city: string;
+  address: string;
+  price: number;
+  observedAt: Date;
+  confidence: number;
+  sourceUrl: string;
+  latitude: number;
+  longitude: number;
+  distanceKm: number;
+};
+
 const asNumber = (value: { toNumber(): number } | null) => value?.toNumber() ?? null;
 
 function haversineKm(lat1: number, lon1: number, lat2: number, lon2: number) {
