@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
-import { FuelType } from "@prisma/client";
 import { fuelOverview } from "@/lib/queries";
+import type { FuelType } from "@prisma/client";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
@@ -63,41 +63,51 @@ async function liveKaraiAverage(fuelType: FuelType) {
 }
 
 export async function GET(_request: Request, context: { params: Promise<{ fuel: string }> }) {
-  const { fuel } = await context.params;
-  const fuelType = aliases[fuel.toLowerCase()];
-  if (!fuelType) return NextResponse.json({ error: "Unsupported fuel type" }, { status: 400 });
-
-  // The overview must always have a live market fallback. Query the lightweight
-  // market source first so a temporary Neon/Prisma problem cannot blank the card.
   try {
-    const live = await liveKaraiAverage(fuelType);
-    return NextResponse.json(live, {
-      headers: {
-        "Cache-Control": "no-store, max-age=0",
-        "X-FuelTracker-Data": "karai-live",
-      },
-    });
-  } catch (liveError) {
-    console.error(`Fuel overview live KARAI failed (${fuel}):`, liveError);
-  }
+    const { fuel } = await context.params;
+    const fuelType = aliases[fuel.toLowerCase()];
+    if (!fuelType) {
+      return NextResponse.json({ error: "Unsupported fuel type", fuel }, { status: 400 });
+    }
 
-  // Fall back to stored observations if the live source is temporarily unavailable.
-  try {
-    const result = await fuelOverview(fuelType);
-    if (result.average != null) {
-      return NextResponse.json(result, {
+    // The overview card must work even when Neon/Prisma is temporarily unavailable.
+    // KARAI is a lightweight live market source, so try it first.
+    try {
+      const live = await liveKaraiAverage(fuelType);
+      return NextResponse.json(live, {
         headers: {
           "Cache-Control": "no-store, max-age=0",
-          "X-FuelTracker-Data": "neon",
+          "X-FuelTracker-Data": "karai-live",
         },
       });
+    } catch (liveError) {
+      console.error(`Fuel overview live KARAI failed (${fuel}):`, liveError);
     }
-  } catch (databaseError) {
-    console.error(`Fuel overview Neon read failed (${fuel}):`, databaseError);
-  }
 
-  return NextResponse.json(
-    { error: "Няма налична средна цена в момента." },
-    { status: 503, headers: { "Cache-Control": "no-store, max-age=0" } },
-  );
+    try {
+      const result = await fuelOverview(fuelType);
+      return NextResponse.json(
+        { ...result, source: result.dataType === "STATION_PRICES" ? "fuelo-db" : "market-db" },
+        {
+          headers: {
+            "Cache-Control": "no-store, max-age=0",
+            "X-FuelTracker-Data": "neon",
+          },
+        },
+      );
+    } catch (databaseError) {
+      console.error(`Fuel overview Neon read failed (${fuel}):`, databaseError);
+    }
+
+    return NextResponse.json(
+      { error: "Няма налична средна цена в момента.", fuel },
+      { status: 503, headers: { "Cache-Control": "no-store, max-age=0" } },
+    );
+  } catch (error) {
+    console.error("Unhandled fuel overview route error:", error);
+    return NextResponse.json(
+      { error: "Вътрешна грешка при зареждане на цената." },
+      { status: 500, headers: { "Cache-Control": "no-store, max-age=0" } },
+    );
+  }
 }
