@@ -33,6 +33,7 @@ function toNumber(value: string | number | null | undefined): number | null {
 export class KaraiAdapter implements MarketCollector {
   name = "KARAI";
   kind = "MARKET" as const;
+  sourceKind = "API" as const;
   baseUrl = "https://karai.bg/api/fuel-prices";
 
   async collect(): Promise<MarketObservation[]> {
