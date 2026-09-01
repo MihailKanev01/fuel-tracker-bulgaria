@@ -23,7 +23,7 @@ export async function GET(request: Request) {
   const lat = numberParam(searchParams.get("lat"));
   const lon = numberParam(searchParams.get("lon"));
   const radius = numberParam(searchParams.get("radius")) ?? 5;
-  const limit = Math.min(50, Math.max(1, Math.round(numberParam(searchParams.get("limit")) ?? 10)));
+  const limit = Math.min(1000, Math.max(1, Math.round(numberParam(searchParams.get("limit")) ?? 1000)));
   const fuel = aliases[(searchParams.get("fuel") ?? "diesel").toLowerCase()];
 
   if (!fuel) return NextResponse.json({ error: "Unsupported fuel type" }, { status: 400 });
