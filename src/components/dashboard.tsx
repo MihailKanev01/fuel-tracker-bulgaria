@@ -69,7 +69,7 @@ export function Dashboard() {
     setNearbyLoading(true);
     setNearby([]);
     setLocationError(null);
-    fetch(`/api/prices/nearby?lat=${encodeURIComponent(coords.lat)}&lon=${encodeURIComponent(coords.lon)}&radius=${radius}&limit=10&fuel=${fuel}`, { signal: controller.signal })
+    fetch(`/api/prices/nearby?lat=${encodeURIComponent(coords.lat)}&lon=${encodeURIComponent(coords.lon)}&radius=${radius}&limit=250&fuel=${fuel}`, { signal: controller.signal })
       .then((r) => {
         if (!r.ok) throw new Error("Неуспешно зареждане на близките станции");
         return r.json();
@@ -114,25 +114,50 @@ export function Dashboard() {
 
   return <main className="shell">
     <header><a className="brand" href="/">Fuel<span>Tracker</span><i>BG</i></a><nav><a className="active" href="#overview">Обзор</a><a href="#cheapest">Най-евтин</a><a href="#changes">Промени</a><a href="/admin">Админ</a></nav><div className="header-actions"><ThemeToggle /><button className="live"><b /> Данни на живо</button></div></header>
+
     <section className="fuel-selector-section"><div><p className="eyebrow">ИЗБЕРИ ГОРИВО</p><div className="fuel-selector">{FUEL_OPTIONS.map((option) => <button key={option.key} type="button" className={fuel === option.key ? "selected" : ""} onClick={() => setFuel(option.key)}>{option.label}</button>)}</div></div></section>
+
     <section className="hero" id="overview"><div><p className="eyebrow">БЪЛГАРИЯ · {label.toUpperCase()}</p><h1>Цената на <em>{label.toLowerCase()},</em><br />без догадки.</h1><p className="lede">Показваме само проследими цени с посочен източник и време на наблюдение.</p></div><div className="hero-chip"><span>Надеждност</span><strong>{overview?.confidence ?? "—"}{overview?.confidence != null && "%"}</strong><small>{overview?.stationCount ?? 0} валидни обекта</small></div></section>
+
     <section className="primary-card"><div className="price-head"><div><p>СРЕДНА ЦЕНА · {label.toUpperCase()}</p><h2>{hasData ? fmt.format(overview!.average!) : "Няма данни"}<small>{hasData && " / литър"}</small></h2><div className={movement && movement.value >= 0 ? "movement up" : "movement down"}>{movement ? `${movement.value >= 0 ? "▲" : "▼"} ${fmt.format(Math.abs(movement.value))} · ${Math.abs(movement.percent).toFixed(1)}% за избрания период` : "Няма достатъчно история за тренд"}</div></div><div className="fresh"><span className={overview?.latest ? "dot fresh" : "dot"} />Последно обновяване: <b>{age(overview?.latest ?? null)}</b><small>{overview?.sourceCount ?? 0} потвърдени източника</small></div></div>
       <div className="periods">{[[1,"24ч"],[7,"7 дни"],[30,"30 дни"],[90,"3 мес"],[365,"1 год"]].map(([value,labelText]) => <button key={String(value)} onClick={() => setPeriod(Number(value))} className={period === value ? "selected" : ""}>{labelText}</button>)}</div>
       <div className="chart-wrap">{history.length ? <ResponsiveContainer width="100%" height={290}><AreaChart data={history}><defs><linearGradient id="fuel" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stopColor="#bfef4b" stopOpacity=".36"/><stop offset="100%" stopColor="#bfef4b" stopOpacity="0"/></linearGradient></defs><CartesianGrid vertical={false} stroke="#23302f"/><XAxis dataKey="date" tickLine={false} axisLine={false} tick={{ fill: "#778481", fontSize: 11 }}/><YAxis domain={["dataMin - 0.01", "dataMax + 0.01"]} tickFormatter={(v) => `€${v.toFixed(2)}`} tickLine={false} axisLine={false} tick={{ fill: "#778481", fontSize: 11 }}/><Tooltip contentStyle={{ background: "#15201f", border: "1px solid #30413e", borderRadius: 10 }} formatter={(v) => fmt.format(Number(v))}/><Area type="monotone" dataKey="average" stroke="#c6f44d" strokeWidth={3} fill="url(#fuel)" /></AreaChart></ResponsiveContainer> : <Empty label={loading ? "Зареждаме потвърдените наблюдения…" : "Все още няма валидирани ценови наблюдения за този период."}/>}</div>
     </section>
-    <section className="stats">{[["Средна",overview?.average],["Най-ниска",overview?.lowest],["Най-висока",overview?.highest],["Медианна",overview?.median]].map(([labelText, value]) => <article key={String(labelText)}><span>{labelText}</span><strong>{typeof value === "number" ? fmt.format(value) : "—"}</strong><small>без аномални стойности</small></article>)}</section>
-    <section className="grid"><article className="panel" id="cheapest"><div className="panel-title"><div><h3>НАЙ-ЕВТИН ДО ТЕБ · {label.toUpperCase()}</h3><small style={{opacity:.7}}>{coords ? `сортирани по цена · ${radius} km` : "Нуждаем се от твоето местоположение"}</small></div><button type="button" onClick={getLocation} disabled={locationLoading}>{locationLoading ? "Търсим…" : "Моето местоположение"}</button></div>
-      <div className="periods nearby-periods" role="group" aria-label="Радиус за близки станции">{[5,10,25,50].map((value)=><button key={value} type="button" onClick={()=>setRadius(value)} className={radius===value?"selected":""}>{value} km</button>)}</div>
-      {locationError ? <div className="empty">◌ {locationError}</div> : null}
-      {nearbyLoading ? <div className="empty">◌ Търсим най-евтиния {label.toLowerCase()} около теб…</div> : null}
-      {!coords && !locationLoading && !locationError ? <div className="empty">◌ Използвай местоположението си, за да видиш най-евтиния вариант наблизо.</div> : null}
-      <div className="station-list">{nearby.length ? nearby.slice(0,5).map((station,index)=><a key={station.id} className="station" href={station.sourceUrl} target="_blank" rel="noreferrer"><b>{String(index+1).padStart(2,"0")}</b><div><strong>{station.brand ?? station.name}</strong><span>{station.city} · {station.address}</span></div><div className="station-price"><strong>{fmt.format(station.price)}</strong><span>{station.distanceKm.toFixed(1)} км · {age(station.observedAt)}</span></div></a>):null}</div>
-      {coords&&!nearbyLoading&&nearby.length===0&&!locationError?<div className="empty">◌ Няма станции с валидна цена в радиус {radius} km.</div>:null}
-      <LocationMap latitude={coords?.lat??null} longitude={coords?.lon??null} radiusKm={radius} stations={nearby}/></article>
-      <article className="panel" id="changes"><div className="panel-title"><h3>ПОСЛЕДНИ ПРОМЕНИ · {label.toUpperCase()}</h3><a href="#">Цял журнал →</a></div><div className="change-list">{changes.length ? changes.slice(0,5).map((change)=><a key={change.id} className="change" href={change.sourceUrl} target="_blank" rel="noreferrer"><div className={change.change>=0?"arrow rise":"arrow fall"}>{change.change>=0?"↑":"↓"}</div><div><strong>{change.station} <span>· {change.city}</span></strong><small>{fmt.format(change.oldPrice)} → {fmt.format(change.newPrice)} · {age(change.detectedAt)}</small></div><b className={change.change>=0?"rise":"fall"}>{change.change>=0?"+":""}{fmt.format(change.change)}</b></a>):<Empty label="Ще се появят при първата открита промяна."/>}</div></article></section>
-    <DieselForecast fuel={fuel}/>
+
+    <section className="stats">{[["Средна", overview?.average],["Най-ниска", overview?.lowest],["Най-висока", overview?.highest],["Медианна", overview?.median]].map(([labelText, value]) => <article key={String(labelText)}><span>{labelText}</span><strong>{typeof value === "number" ? fmt.format(value) : "—"}</strong><small>без аномални стойности</small></article>)}</section>
+
+    <section className="grid">
+      <article className="panel" id="cheapest">
+        <div className="panel-title">
+          <div>
+            <h3>НАЙ-ЕВТИН ДО ТЕБ · {label.toUpperCase()}</h3>
+            <small style={{ opacity: .7 }}>{coords ? `сортирани по цена · ${radius} km · ${nearby.length} станции` : "Нуждаем се от твоето местоположение"}</small>
+          </div>
+          <button type="button" onClick={getLocation} disabled={locationLoading}>{locationLoading ? "Търсим…" : "Моето местоположение"}</button>
+        </div>
+
+        <div className="periods nearby-periods" role="group" aria-label="Радиус за близки станции">
+          {[5, 10, 25, 50].map((value) => <button key={value} type="button" onClick={() => setRadius(value)} className={radius === value ? "selected" : ""}>{value} km</button>)}
+        </div>
+
+        {locationError ? <div className="empty">◌ {locationError}</div> : null}
+        {nearbyLoading ? <div className="empty">◌ Търсим всички станции в радиус {radius} km…</div> : null}
+        {!coords && !locationLoading && !locationError ? <div className="empty">◌ Използвай местоположението си, за да видиш най-евтиния вариант наблизо.</div> : null}
+
+        <div className="station-list">
+          {nearby.length ? nearby.map((station, index) => <a key={station.id} className="station" href={station.sourceUrl} target="_blank" rel="noreferrer"><b>{String(index + 1).padStart(2,"0")}</b><div><strong>{station.brand ?? station.name}</strong><span>{station.city} · {station.address}</span></div><div className="station-price"><strong>{fmt.format(station.price)}</strong><span>{station.distanceKm.toFixed(1)} км · {age(station.observedAt)}</span></div></a>) : null}
+        </div>
+
+        {coords && !nearbyLoading && nearby.length === 0 && !locationError ? <div className="empty">◌ Няма станции с валидна цена в радиус {radius} km.</div> : null}
+        <LocationMap latitude={coords?.lat ?? null} longitude={coords?.lon ?? null} radiusKm={radius} stations={nearby} />
+      </article>
+
+      <article className="panel" id="changes"><div className="panel-title"><h3>ПОСЛЕДНИ ПРОМЕНИ · {label.toUpperCase()}</h3><a href="#">Цял журнал →</a></div><div className="change-list">{changes.length ? changes.slice(0,5).map((change) => <a key={change.id} className="change" href={change.sourceUrl} target="_blank" rel="noreferrer"><div className={change.change >= 0 ? "arrow rise" : "arrow fall"}>{change.change >= 0 ? "↑" : "↓"}</div><div><strong>{change.station} <span>· {change.city}</span></strong><small>{fmt.format(change.oldPrice)} → {fmt.format(change.newPrice)} · {age(change.detectedAt)}</small></div><b className={change.change >= 0 ? "rise" : "fall"}>{change.change >= 0 ? "+" : ""}{fmt.format(change.change)}</b></a>) : <Empty label="Ще се появят при първата открита промяна."/>}</div></article>
+    </section>
+
+    <DieselForecast fuel={fuel} />
     <section className="insight"><div className="signal">⌁</div><div><p className="eyebrow">ПАЗАРЕН КОНТЕКСТ</p><h3>Какво движи {label.toLowerCase()}?</h3><p>Тази секция показва проверени факти от свързани пазарни източници. Причинно-следствени изводи не се правят, докато данните не са достатъчни.</p></div><span className="pending">Очаква пазарни данни</span></section>
     <footer>FUEL TRACKER BULGARIA <span>·</span> Цените се публикуват с източник, час и индикатор за свежест.</footer>
   </main>;
 }
-function Empty({label}:{label:string}){return <div className="empty"><span>◌</span>{label}</div>;}
+function Empty({ label }: { label: string }) { return <div className="empty"><span>◌</span>{label}</div>; }
