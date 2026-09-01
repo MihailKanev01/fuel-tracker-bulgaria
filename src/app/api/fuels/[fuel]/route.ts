@@ -23,9 +23,27 @@ const marketMetric: Record<FuelType, string> = {
   CNG: "methane",
 };
 
+const fuelLabels: Record<FuelType, string> = {
+  DIESEL: "diesel",
+  GASOLINE_95: "A95",
+  GASOLINE_100: "A100",
+  LPG: "LPG",
+  CNG: "CNG",
+};
+
+type KaraiProvider = {
+  name?: string;
+  diesel?: string | number | null;
+  a95?: string | number | null;
+  a100?: string | number | null;
+  lpg?: string | number | null;
+  methane?: string | number | null;
+};
+
 type KaraiResponse = {
   fetchedAt?: string;
   averages?: Record<string, string | number | null | undefined>;
+  providers?: KaraiProvider[];
 };
 
 function toNumber(value: string | number | null | undefined): number | null {
@@ -43,8 +61,24 @@ async function liveKaraiAverage(fuelType: FuelType) {
 
   if (!response.ok) throw new Error(`KARAI API returned ${response.status}`);
   const data = (await response.json()) as KaraiResponse;
-  const value = toNumber(data.averages?.[marketMetric[fuelType]]);
-  if (value == null) throw new Error(`KARAI has no average for ${fuelType}`);
+  const metricKey = marketMetric[fuelType];
+
+  let value = toNumber(data.averages?.[metricKey]);
+
+  // KARAI publishes the common fuels in averages, but premium A100 may only
+  // be present at provider level. Aggregate those provider observations when
+  // the national average is unavailable.
+  if (value == null && data.providers?.length) {
+    const providerValues = data.providers
+      .map((provider) => toNumber(provider[metricKey as keyof KaraiProvider] as string | number | null | undefined))
+      .filter((item): item is number => item != null);
+
+    if (providerValues.length) {
+      value = providerValues.reduce((sum, item) => sum + item, 0) / providerValues.length;
+    }
+  }
+
+  if (value == null) throw new Error(`KARAI has no average for ${fuelLabels[fuelType]}`);
 
   const observedAt = data.fetchedAt ? new Date(data.fetchedAt) : new Date();
   const latest = Number.isNaN(observedAt.getTime()) ? new Date().toISOString() : observedAt.toISOString();
@@ -68,9 +102,8 @@ export async function GET(_request: Request, context: { params: Promise<{ fuel: 
     const fuelType = aliases[fuel.toLowerCase()];
     if (!fuelType) return NextResponse.json({ error: "Unsupported fuel type", fuel }, { status: 400 });
 
-    // Use persisted station observations first. This is the same data path
-    // that powered the original working Diesel overview and is the most
-    // useful source for station-level statistics.
+    // Keep the proven database path first. Fuelo station observations are the
+    // best source for station-level statistics and work for every fuel type.
     try {
       const persisted = await fuelOverview(fuelType);
       if (persisted.average != null) {
@@ -83,7 +116,6 @@ export async function GET(_request: Request, context: { params: Promise<{ fuel: 
       console.error(`Fuel overview Neon read failed (${fuel}):`, databaseError);
     }
 
-    // Fall back to the live market source when the database has no data.
     try {
       const live = await liveKaraiAverage(fuelType);
       return NextResponse.json(live, {
