@@ -49,6 +49,20 @@ function loadLeaflet() {
   });
 }
 
+function navigationUrls(station: Station) {
+  const destination = station.latitude != null && station.longitude != null
+    ? `${station.latitude},${station.longitude}`
+    : `${station.name}, ${station.address}`;
+
+  return {
+    google: `https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(destination)}`,
+    waze: station.latitude != null && station.longitude != null
+      ? `https://www.waze.com/ul?ll=${station.latitude}%2C${station.longitude}&navigate=yes`
+      : `https://www.waze.com/ul?q=${encodeURIComponent(destination)}&navigate=yes`,
+    apple: `https://maps.apple.com/?daddr=${encodeURIComponent(destination)}&dirflg=d`,
+  };
+}
+
 export function LocationMap({ latitude, longitude, radiusKm, stations }: {
   latitude: number | null;
   longitude: number | null;
@@ -61,6 +75,7 @@ export function LocationMap({ latitude, longitude, radiusKm, stations }: {
   const layerRef = useRef<any>(null);
   const [precisePosition, setPrecisePosition] = useState<{ lat: number; lon: number; accuracy: number } | null>(null);
   const [fullscreen, setFullscreen] = useState(false);
+  const [navigationStation, setNavigationStation] = useState<Station | null>(null);
 
   useEffect(() => {
     if (!("geolocation" in navigator)) return;
@@ -98,6 +113,36 @@ export function LocationMap({ latitude, longitude, radiusKm, stations }: {
 
     document.addEventListener("fullscreenchange", onFullscreenChange);
     return () => document.removeEventListener("fullscreenchange", onFullscreenChange);
+  }, []);
+
+  useEffect(() => {
+    const onStationClick = (event: MouseEvent) => {
+      const target = event.target as HTMLElement | null;
+      const link = target?.closest<HTMLAnchorElement>("a.station");
+      if (!link) return;
+
+      const nameElement = link.querySelector<HTMLElement>("strong");
+      const stationName = nameElement?.textContent?.trim();
+      if (!stationName) return;
+
+      const station = stations.find((item) => item.name === stationName);
+      if (!station) return;
+
+      event.preventDefault();
+      event.stopPropagation();
+      setNavigationStation(station);
+    };
+
+    document.addEventListener("click", onStationClick, true);
+    return () => document.removeEventListener("click", onStationClick, true);
+  }, [stations]);
+
+  useEffect(() => {
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setNavigationStation(null);
+    };
+    document.addEventListener("keydown", onKeyDown);
+    return () => document.removeEventListener("keydown", onKeyDown);
   }, []);
 
   const userLat = precisePosition?.lat ?? latitude;
@@ -181,7 +226,7 @@ export function LocationMap({ latitude, longitude, radiusKm, stations }: {
         }).addTo(layer);
 
         marker.bindPopup(
-          `<strong>${escapeHtml(station.name)}</strong><br/>${escapeHtml(station.city)}<br/><b>${station.price.toFixed(3)} €/л</b>${station.distanceKm != null ? `<br/>${station.distanceKm.toFixed(2)} km` : ""}`,
+          `<strong>${escapeHtml(station.name)}</strong><br/>${escapeHtml(station.city)}<br/><b>${station.price.toFixed(3)} €/л</b>${station.distanceKm != null ? `<br/>${station.distanceKm.toFixed(2)} km` : ""}<br/><span style="color:#9fce5e">Избери станцията от списъка за навигация</span>`,
         );
         bounds.extend([station.latitude, station.longitude]);
       }
@@ -250,92 +295,202 @@ export function LocationMap({ latitude, longitude, radiusKm, stations }: {
     );
   }
 
-  return (
-    <div
-      ref={containerRef}
-      style={{
-        position: "relative",
-        height: fullscreen ? "100vh" : 280,
-        width: "100%",
-        marginTop: fullscreen ? 0 : 16,
-        overflow: "hidden",
-        border: fullscreen ? "0" : "1px solid #273530",
-        borderRadius: fullscreen ? 0 : 10,
-        background: "#111a18",
-      }}
-    >
-      <div ref={mapRef} style={{ height: "100%", width: "100%" }} />
+  const urls = navigationStation ? navigationUrls(navigationStation) : null;
 
-      <button
-        type="button"
-        onClick={toggleFullscreen}
-        aria-label={fullscreen ? "Затвори цял екран" : "Отвори картата на цял екран"}
-        title={fullscreen ? "Затвори цял екран" : "Цял екран"}
+  return (
+    <>
+      <div
+        ref={containerRef}
         style={{
-          position: "absolute",
-          top: 10,
-          right: 10,
-          zIndex: 1000,
-          width: 40,
-          height: 40,
-          display: "grid",
-          placeItems: "center",
-          border: "1px solid #395044",
-          borderRadius: 10,
-          background: "rgba(11,17,16,.92)",
-          color: "#d7e1dc",
-          cursor: "pointer",
-          fontSize: 20,
-          lineHeight: 1,
-          boxShadow: "0 8px 24px rgba(0,0,0,.28)",
-          backdropFilter: "blur(8px)",
+          position: "relative",
+          height: fullscreen ? "100vh" : 280,
+          width: "100%",
+          marginTop: fullscreen ? 0 : 16,
+          overflow: "hidden",
+          border: fullscreen ? "0" : "1px solid #273530",
+          borderRadius: fullscreen ? 0 : 10,
+          background: "#111a18",
         }}
       >
-        {fullscreen ? "✕" : "⛶"}
-      </button>
+        <div ref={mapRef} style={{ height: "100%", width: "100%" }} />
 
-      {fullscreen ? (
+        <button
+          type="button"
+          onClick={toggleFullscreen}
+          aria-label={fullscreen ? "Затвори цял екран" : "Отвори картата на цял екран"}
+          title={fullscreen ? "Затвори цял екран" : "Цял екран"}
+          style={{
+            position: "absolute",
+            top: 10,
+            right: 10,
+            zIndex: 1000,
+            width: 40,
+            height: 40,
+            display: "grid",
+            placeItems: "center",
+            border: "1px solid #395044",
+            borderRadius: 10,
+            background: "rgba(11,17,16,.92)",
+            color: "#d7e1dc",
+            cursor: "pointer",
+            fontSize: 20,
+            lineHeight: 1,
+            boxShadow: "0 8px 24px rgba(0,0,0,.28)",
+            backdropFilter: "blur(8px)",
+          }}
+        >
+          {fullscreen ? "✕" : "⛶"}
+        </button>
+
+        {fullscreen ? (
+          <div style={{
+            position: "absolute",
+            top: 10,
+            left: 10,
+            zIndex: 1000,
+            padding: "8px 11px",
+            border: "1px solid #395044",
+            borderRadius: 9,
+            background: "rgba(11,17,16,.92)",
+            color: "#d7e1dc",
+            font: "11px DM Mono, monospace",
+            backdropFilter: "blur(8px)",
+          }}>
+            Около теб · {radiusKm} km
+          </div>
+        ) : null}
+
         <div style={{
           position: "absolute",
-          top: 10,
           left: 10,
-          zIndex: 1000,
-          padding: "8px 11px",
+          bottom: 10,
+          zIndex: 500,
+          display: "flex",
+          gap: 8,
+          flexWrap: "wrap",
+          padding: "7px 9px",
           border: "1px solid #395044",
-          borderRadius: 9,
-          background: "rgba(11,17,16,.92)",
-          color: "#d7e1dc",
-          font: "11px DM Mono, monospace",
+          borderRadius: 8,
+          background: "rgba(11,17,16,.88)",
           backdropFilter: "blur(8px)",
+          color: "#d7e1dc",
+          font: "10px DM Mono, monospace",
         }}>
-          Около теб · {radiusKm} km
+          <span><i style={{ display: "inline-block", width: 8, height: 8, borderRadius: "50%", background: "#4da3ff", marginRight: 5 }} />Ти</span>
+          <span><i style={{ display: "inline-block", width: 8, height: 8, borderRadius: "50%", background: "#c8f65b", marginRight: 5 }} />Бензиностанции</span>
+          <span><i style={{ display: "inline-block", width: 8, height: 8, borderRadius: "50%", border: "1px solid #c8f65b", marginRight: 5 }} />Радиус {radiusKm} km</span>
+          {precisePosition?.accuracy ? <span>± {Math.round(precisePosition.accuracy)} m</span> : null}
+        </div>
+      </div>
+
+      {navigationStation && urls ? (
+        <div
+          role="dialog"
+          aria-modal="true"
+          aria-label="Избери приложение за навигация"
+          onClick={() => setNavigationStation(null)}
+          style={{
+            position: "fixed",
+            inset: 0,
+            zIndex: 3000,
+            display: "grid",
+            placeItems: "center",
+            padding: 20,
+            background: "rgba(5,10,9,.74)",
+            backdropFilter: "blur(10px)",
+          }}
+        >
+          <div
+            onClick={(event) => event.stopPropagation()}
+            style={{
+              width: "min(430px, 100%)",
+              border: "1px solid #395044",
+              borderRadius: 16,
+              background: "linear-gradient(145deg,#16211e,#0f1715)",
+              boxShadow: "0 30px 90px rgba(0,0,0,.55)",
+              padding: 22,
+              color: "#e8edeb",
+              fontFamily: "Manrope, Arial, sans-serif",
+            }}
+          >
+            <div style={{ display: "flex", justifyContent: "space-between", gap: 16, alignItems: "flex-start", marginBottom: 18 }}>
+              <div>
+                <div style={{ color: "#91aa9f", font: "500 10px DM Mono, monospace", letterSpacing: 1.2, marginBottom: 7 }}>НАВИГАЦИЯ</div>
+                <h3 style={{ margin: 0, fontSize: 21, letterSpacing: -0.7 }}>{navigationStation.name}</h3>
+                <p style={{ margin: "6px 0 0", color: "#899691", fontSize: 12, lineHeight: 1.5 }}>{navigationStation.address}</p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setNavigationStation(null)}
+                aria-label="Затвори"
+                style={{
+                  width: 32,
+                  height: 32,
+                  borderRadius: "50%",
+                  border: "1px solid #395044",
+                  background: "#14201b",
+                  color: "#aebbb5",
+                  cursor: "pointer",
+                  fontSize: 18,
+                }}
+              >×</button>
+            </div>
+
+            <p style={{ margin: "0 0 12px", color: "#72817a", font: "11px DM Mono, monospace" }}>Избери приложение за маршрут до станцията:</p>
+
+            <div style={{ display: "grid", gap: 9 }}>
+              <a href={urls.google} target="_blank" rel="noreferrer" style={navigationButtonStyle}>
+                <span style={appIconStyle}>G</span>
+                <span><b style={appTitleStyle}>Google Maps</b><small style={appMetaStyle}>Маршрут до точните координати</small></span>
+                <span style={arrowStyle}>→</span>
+              </a>
+              <a href={urls.waze} target="_blank" rel="noreferrer" style={navigationButtonStyle}>
+                <span style={{ ...appIconStyle, background: "#dceef2", color: "#1590ad" }}>W</span>
+                <span><b style={appTitleStyle}>Waze</b><small style={appMetaStyle}>Навигация до координатите</small></span>
+                <span style={arrowStyle}>→</span>
+              </a>
+              <a href={urls.apple} target="_blank" rel="noreferrer" style={navigationButtonStyle}>
+                <span style={{ ...appIconStyle, background: "#e1e5e4", color: "#111a18" }}></span>
+                <span><b style={appTitleStyle}>Apple Maps</b><small style={appMetaStyle}>Отваряне на маршрут</small></span>
+                <span style={arrowStyle}>→</span>
+              </a>
+            </div>
+          </div>
         </div>
       ) : null}
-
-      <div style={{
-        position: "absolute",
-        left: 10,
-        bottom: 10,
-        zIndex: 500,
-        display: "flex",
-        gap: 8,
-        flexWrap: "wrap",
-        padding: "7px 9px",
-        border: "1px solid #395044",
-        borderRadius: 8,
-        background: "rgba(11,17,16,.88)",
-        backdropFilter: "blur(8px)",
-        color: "#d7e1dc",
-        font: "10px DM Mono, monospace",
-      }}>
-        <span><i style={{ display: "inline-block", width: 8, height: 8, borderRadius: "50%", background: "#4da3ff", marginRight: 5 }} />Ти</span>
-        <span><i style={{ display: "inline-block", width: 8, height: 8, borderRadius: "50%", background: "#c8f65b", marginRight: 5 }} />Бензиностанции</span>
-        <span><i style={{ display: "inline-block", width: 8, height: 8, borderRadius: "50%", border: "1px solid #c8f65b", marginRight: 5 }} />Радиус {radiusKm} km</span>
-        {precisePosition?.accuracy ? <span>± {Math.round(precisePosition.accuracy)} m</span> : null}
-      </div>
-    </div>
+    </>
   );
 }
+
+const navigationButtonStyle: React.CSSProperties = {
+  display: "flex",
+  alignItems: "center",
+  gap: 11,
+  padding: "11px 12px",
+  border: "1px solid #2e4039",
+  borderRadius: 11,
+  background: "#13201b",
+  color: "inherit",
+  textDecoration: "none",
+  transition: "border-color .18s ease, background .18s ease, transform .18s ease",
+};
+
+const appIconStyle: React.CSSProperties = {
+  width: 30,
+  height: 30,
+  display: "grid",
+  placeItems: "center",
+  flex: "0 0 auto",
+  borderRadius: 8,
+  background: "#dff08d",
+  color: "#20301c",
+  fontWeight: 800,
+  fontSize: 13,
+};
+
+const appTitleStyle: React.CSSProperties = { display: "block", fontSize: 13 };
+const appMetaStyle: React.CSSProperties = { display: "block", marginTop: 2, color: "#7e8c87", font: "10px DM Mono, monospace" };
+const arrowStyle: React.CSSProperties = { marginLeft: "auto", color: "#c8f65b", fontSize: 17 };
 
 function escapeHtml(value: string) {
   return value
