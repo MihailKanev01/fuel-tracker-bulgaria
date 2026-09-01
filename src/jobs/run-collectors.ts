@@ -1,5 +1,5 @@
 import { allCollectors } from "@/lib/collectors";
-import { ingest, ingestMarket } from "@/lib/ingest";
+import { ingest, ingestMarket, ingestNews } from "@/lib/ingest";
 import type { Collector } from "@/lib/collectors/types";
 
 async function runCollector(collector: Collector) {
@@ -9,7 +9,7 @@ async function runCollector(collector: Collector) {
     case "MARKET":
       return ingestMarket(collector);
     case "NEWS":
-      throw new Error(`News ingestion is not implemented yet for ${collector.name}`);
+      return ingestNews(collector);
   }
 }
 
