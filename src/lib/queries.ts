@@ -11,6 +11,17 @@ export const FUEL_LABELS: Record<FuelType, string> = {
   CNG: "CNG",
 };
 
+function fuelMetricKey(fuelType: FuelType) {
+  return fuelType === "GASOLINE_95" ? "a95" : fuelType === "GASOLINE_100" ? "a100" : fuelType === "LPG" ? "lpg" : fuelType === "CNG" ? "cng" : "diesel";
+}
+
+function median(values: number[]) {
+  if (!values.length) return null;
+  const sorted = [...values].sort((a, b) => a - b);
+  const middle = Math.floor(sorted.length / 2);
+  return sorted.length % 2 ? sorted[middle] : (sorted[middle - 1] + sorted[middle]) / 2;
+}
+
 export async function fuelOverview(fuelType: FuelType) {
   const latestRows = await prisma.$queryRaw<
     { station_id: string; price_eur: { toNumber(): number }; observed_at: Date; confidence: number }[]
@@ -25,7 +36,7 @@ export async function fuelOverview(fuelType: FuelType) {
     ORDER BY "stationId", "observedAt" DESC
   `;
 
-  const values = latestRows.map((item) => item.price_eur.toNumber()).sort((a, b) => a - b);
+  const values = latestRows.map((item) => item.price_eur.toNumber()).filter(Number.isFinite).sort((a, b) => a - b);
   const sources = await prisma.source.count({ where: { status: "ONLINE", lastSuccessAt: { not: null } } });
 
   if (values.length) {
@@ -34,7 +45,7 @@ export async function fuelOverview(fuelType: FuelType) {
       average: values.reduce((total, value) => total + value, 0) / values.length,
       lowest: values[0] ?? null,
       highest: values.at(-1) ?? null,
-      median: values[Math.floor(values.length / 2)] ?? null,
+      median: median(values),
       stationCount: values.length,
       sourceCount: sources,
       confidence: Math.round(latestRows.reduce((total, row) => total + row.confidence, 0) / latestRows.length),
@@ -43,19 +54,48 @@ export async function fuelOverview(fuelType: FuelType) {
     };
   }
 
-  const metric = `fuel.${fuelType === "GASOLINE_95" ? "a95" : fuelType === "GASOLINE_100" ? "a100" : fuelType === "LPG" ? "lpg" : fuelType === "CNG" ? "cng" : "diesel"}.average`;
-  const marketAverage = await prisma.marketDatum.findFirst({ where: { metric }, orderBy: { observedAt: "desc" } });
+  const metricKey = fuelMetricKey(fuelType);
+  const averageMetric = `fuel.${metricKey}.average`;
+  const marketRows = await prisma.marketDatum.findMany({
+    where: {
+      OR: [
+        { metric: averageMetric },
+        { metric: { startsWith: `provider.`, endsWith: `.${metricKey}` } },
+      ],
+    },
+    orderBy: { observedAt: "desc" },
+    select: { metric: true, value: true, observedAt: true },
+  });
+
+  // Prefer the explicitly published national average when available. Otherwise
+  // aggregate the latest provider observations (useful especially for A100).
+  const national = marketRows.find((row) => row.metric === averageMetric);
+  let statisticRows = national ? marketRows.filter((row) => row.observedAt.getTime() === national.observedAt.getTime() && row.metric === averageMetric) : [];
+
+  if (!national) {
+    const latestByProvider = new Map<string, { value: number; observedAt: Date }>();
+    for (const row of marketRows) {
+      if (row.metric === averageMetric) continue;
+      const provider = row.metric.slice("provider.".length, -(metricKey.length + 1));
+      if (!latestByProvider.has(provider)) latestByProvider.set(provider, { value: row.value.toNumber(), observedAt: row.observedAt });
+    }
+    statisticRows = [...latestByProvider.entries()].map(([, row]) => ({ metric: `provider.${metricKey}`, value: new Prisma.Decimal(row.value), observedAt: row.observedAt }));
+  }
+
+  const marketValues = statisticRows.map((row) => row.value.toNumber()).filter(Number.isFinite);
+  const marketLatest = statisticRows.reduce<Date | null>((max, row) => (!max || row.observedAt > max ? row.observedAt : max), null);
+  const average = national?.value.toNumber() ?? (marketValues.length ? marketValues.reduce((sum, value) => sum + value, 0) / marketValues.length : null);
 
   return {
-    average: marketAverage?.value.toNumber() ?? null,
-    lowest: null,
-    highest: null,
-    median: null,
+    average,
+    lowest: marketValues.length ? Math.min(...marketValues) : null,
+    highest: marketValues.length ? Math.max(...marketValues) : null,
+    median: median(marketValues),
     stationCount: 0,
     sourceCount: sources,
-    confidence: null,
-    latest: marketAverage?.observedAt ?? null,
-    dataType: marketAverage ? "MARKET_AVERAGE" as const : "NO_DATA" as const,
+    confidence: average != null ? 60 : null,
+    latest: national?.observedAt ?? marketLatest,
+    dataType: average != null ? "MARKET_AVERAGE" as const : "NO_DATA" as const,
   };
 }
 
@@ -79,7 +119,7 @@ export async function fuelHistory(fuelType: FuelType, days = 30, city?: string) 
   }
 
   if (city) return [];
-  const metric = `fuel.${fuelType === "GASOLINE_95" ? "a95" : fuelType === "GASOLINE_100" ? "a100" : fuelType === "LPG" ? "lpg" : fuelType === "CNG" ? "cng" : "diesel"}.average`;
+  const metric = `fuel.${fuelMetricKey(fuelType)}.average`;
   const marketHistory = await prisma.marketDatum.findMany({ where: { metric, observedAt: { gte: from } }, orderBy: { observedAt: "asc" }, select: { value: true, observedAt: true } });
   const groupedMarket = new Map<string, number[]>();
   for (const item of marketHistory) {
