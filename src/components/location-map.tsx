@@ -165,20 +165,64 @@ export function LocationMap({
 
   if (latitude == null || longitude == null) {
     return (
-      <div className="location-map location-map-empty">
-        <span>◌</span>
-        <p>Картата ще се покаже след получаване на местоположението.</p>
+      <div
+        style={{
+          height: 220,
+          marginTop: 16,
+          border: "1px solid #273530",
+          borderRadius: 10,
+          background: "linear-gradient(135deg,#141f1d,#101817)",
+          display: "grid",
+          placeItems: "center",
+          textAlign: "center",
+          color: "#778580",
+          padding: 20,
+          fontFamily: "DM Mono, monospace",
+          fontSize: 12,
+        }}
+      >
+        <div>
+          <div style={{ fontSize: 26, color: "#5f7169", marginBottom: 8 }}>◌</div>
+          <p style={{ margin: 0 }}>Картата ще се покаже след получаване на местоположението.</p>
+        </div>
       </div>
     );
   }
 
   return (
-    <div className="location-map">
-      <div ref={mapRef} className="location-map-canvas" />
-      <div className="location-map-legend">
-        <span><i className="user-dot" /> Ти</span>
-        <span><i className="station-dot" /> Бензиностанции</span>
-        <span><i className="radius-dot" /> Радиус {radiusKm} km</span>
+    <div
+      style={{
+        position: "relative",
+        height: 280,
+        marginTop: 16,
+        overflow: "hidden",
+        border: "1px solid #273530",
+        borderRadius: 10,
+        background: "#111a18",
+      }}
+    >
+      <div ref={mapRef} style={{ height: "100%", width: "100%" }} />
+      <div
+        style={{
+          position: "absolute",
+          left: 10,
+          bottom: 10,
+          zIndex: 500,
+          display: "flex",
+          gap: 8,
+          flexWrap: "wrap",
+          padding: "7px 9px",
+          border: "1px solid #395044",
+          borderRadius: 8,
+          background: "rgba(11,17,16,.88)",
+          backdropFilter: "blur(8px)",
+          color: "#d7e1dc",
+          font: "10px DM Mono, monospace",
+        }}
+      >
+        <span><i style={{ display: "inline-block", width: 8, height: 8, borderRadius: "50%", background: "#5db7ff", marginRight: 5 }} />Ти</span>
+        <span><i style={{ display: "inline-block", width: 8, height: 8, borderRadius: "50%", background: "#c8f65b", marginRight: 5 }} />Бензиностанции</span>
+        <span><i style={{ display: "inline-block", width: 8, height: 8, borderRadius: "50%", border: "1px solid #c8f65b", marginRight: 5 }} />Радиус {radiusKm} km</span>
       </div>
     </div>
   );
