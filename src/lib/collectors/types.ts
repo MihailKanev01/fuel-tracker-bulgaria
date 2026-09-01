@@ -1,10 +1,12 @@
 import type { IncomingPrice } from "@/lib/domain";
 
 export type CollectorKind = "PRICE" | "MARKET" | "NEWS";
+export type SourceKind = "API" | "OFFICIAL_SITE" | "STRUCTURED_ENDPOINT" | "HTML_PUBLIC";
 
 export type BaseCollector = {
   name: string;
   kind: CollectorKind;
+  sourceKind: SourceKind;
   baseUrl: string;
 };
 
