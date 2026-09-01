@@ -1,20 +1,45 @@
-import { enabledAdapters } from "@/lib/collectors";
-import { ingest } from "@/lib/ingest";
+import { allCollectors } from "@/lib/collectors";
+import { ingest, ingestMarket } from "@/lib/ingest";
+import type { Collector } from "@/lib/collectors/types";
+
+async function runCollector(collector: Collector) {
+  switch (collector.kind) {
+    case "PRICE":
+      return ingest(collector);
+    case "MARKET":
+      return ingestMarket(collector);
+    case "NEWS":
+      throw new Error(`News ingestion is not implemented yet for ${collector.name}`);
+  }
+}
 
 async function main() {
-  const adapters = enabledAdapters();
+  const collectors = allCollectors();
 
-  if (!adapters.length) {
-    console.info("No authorised public data source configured. Nothing collected.");
+  if (!collectors.length) {
+    console.info("No collectors configured. Nothing collected.");
     return;
   }
 
-  const results = await Promise.allSettled(adapters.map(ingest));
   console.table(
-    results.map((result) =>
+    collectors.map((collector) => ({
+      name: collector.name,
+      kind: collector.kind,
+      baseUrl: collector.baseUrl,
+    })),
+  );
+
+  const results = await Promise.allSettled(collectors.map(runCollector));
+
+  console.table(
+    results.map((result, index) =>
       result.status === "fulfilled"
         ? result.value
-        : { error: String(result.reason) },
+        : {
+            source: collectors[index].name,
+            type: collectors[index].kind,
+            error: String(result.reason),
+          },
     ),
   );
 
