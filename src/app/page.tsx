@@ -1,2 +1,10 @@
 import { Dashboard } from "@/components/dashboard";
-export default function Home() { return <Dashboard />; }
+import { ensureInitialData } from "@/lib/bootstrap";
+
+export const dynamic = "force-dynamic";
+export const maxDuration = 60;
+
+export default async function Home() {
+  await ensureInitialData();
+  return <Dashboard />;
+}
