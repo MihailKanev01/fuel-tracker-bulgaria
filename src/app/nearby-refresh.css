@@ -1,0 +1,31 @@
+/* Keep the nearby refresh action inside the panel at every viewport width. */
+.panel#cheapest .panel-title {
+  align-items: flex-start;
+}
+
+.panel#cheapest .panel-title > div {
+  min-width: 0;
+  flex: 1 1 auto;
+}
+
+.panel#cheapest .panel-title > button {
+  display: inline-flex !important;
+  flex: 0 0 auto !important;
+  min-width: 72px;
+  position: relative;
+  z-index: 2;
+}
+
+@media (max-width: 760px) {
+  .panel#cheapest .panel-title {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: start;
+    column-gap: 10px;
+  }
+
+  .panel#cheapest .panel-title > button {
+    justify-self: end;
+    align-self: start;
+  }
+}
