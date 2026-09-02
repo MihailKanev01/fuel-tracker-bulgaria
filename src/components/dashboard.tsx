@@ -30,6 +30,31 @@ const age = (value: string | null) => {
   return minutes < 60 ? `преди ${minutes} мин` : minutes < 1440 ? `преди ${Math.round(minutes / 60)} ч` : `преди ${Math.round(minutes / 1440)} дни`;
 };
 
+const SHARED_NEWS_TERMS = [
+  "петрол", "brent", "opec", "горив", "рафин", "суров", "crude", "oil", "бензи", "енерг",
+];
+const FUEL_NEWS_TERMS: Record<FuelKey, string[]> = {
+  diesel: ["дизел", "дизелов", "diesel", "газьол"],
+  a95: ["a95", "a-95", "бензин", "бензин95", "95 окт", "gasoline", "petrol"],
+  a100: ["a100", "a-100", "a98+", "100 окт", "бензин", "premium gasoline", "gasoline"],
+  lpg: ["lpg", "пропан-бутан", "пропан бутан", "автогаз", "газ пропан", "пропан"],
+  cng: ["cng", "метан", "природен газ", "natural gas", "compressed natural gas"],
+};
+
+function isRelevantNews(item: NewsItem, fuel: FuelKey) {
+  const text = `${item.title} ${item.summary ?? ""}`.toLowerCase();
+  return FUEL_NEWS_TERMS[fuel].some((term) => text.includes(term)) || SHARED_NEWS_TERMS.some((term) => text.includes(term));
+}
+
+function uniqueNews(items: NewsItem[]) {
+  const seen = new Set<string>();
+  return items.filter((item) => {
+    if (seen.has(item.url)) return false;
+    seen.add(item.url);
+    return true;
+  });
+}
+
 export function Dashboard() {
   const [fuel, setFuel] = useState<FuelKey>("diesel");
   const [period, setPeriod] = useState(30);
@@ -123,6 +148,12 @@ export function Dashboard() {
   }, [history]);
   const hasData = overview?.average != null;
   const label = fuelLabel(fuel);
+  const relevantNews = useMemo(() => {
+    const filtered = uniqueNews(news.filter((item) => isRelevantNews(item, fuel)));
+    return filtered.sort((a, b) => new Date(b.publishedAt).getTime() - new Date(a.publishedAt).getTime());
+  }, [news, fuel]);
+  const goodNews = relevantNews.filter((item) => item.impact === "GOOD").slice(0, 4);
+  const badNews = relevantNews.filter((item) => item.impact === "BAD").slice(0, 4);
 
   const refreshLocation = () => {
     if (!("geolocation" in navigator)) {
@@ -153,8 +184,9 @@ export function Dashboard() {
       <div className="chart-wrap">{history.length ? <ResponsiveContainer width="100%" height={290}><AreaChart data={history}><defs><linearGradient id="fuel" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stopColor="#bfef4b" stopOpacity=".36"/><stop offset="100%" stopColor="#bfef4b" stopOpacity="0"/></linearGradient></defs><CartesianGrid vertical={false} stroke="#23302f"/><XAxis dataKey="date" tickLine={false} axisLine={false} tick={{ fill: "#778481", fontSize: 11 }}/><YAxis domain={["dataMin - 0.01", "dataMax + 0.01"]} tickFormatter={(v) => `€${v.toFixed(2)}`} tickLine={false} axisLine={false} tick={{ fill: "#778481", fontSize: 11 }}/><Tooltip contentStyle={{ background: "#15201f", border: "1px solid #30413e", borderRadius: 10 }} formatter={(v) => fmt.format(Number(v))}/><Area type="monotone" dataKey="average" stroke="#c6f44d" strokeWidth={3} fill="url(#fuel)" /></AreaChart></ResponsiveContainer> : <Empty label={loading ? "Зареждаме потвърдените наблюдения…" : "Все още няма валидирани ценови наблюдения за този период."}/>}</div>
     </section>
     <section className="stats">{[["Средна", overview?.average],["Най-ниска", overview?.lowest],["Най-висока", overview?.highest],["Медианна", overview?.median]].map(([labelText, value]) => <article key={String(labelText)}><span>{labelText}</span><strong>{typeof value === "number" ? fmt.format(value) : "—"}</strong><small>без аномални стойности</small></article>)}</section>
-    <section className="grid"><article className="panel" id="cheapest"><div className="panel-title"><div><h3>НАЙ-ЕВТИН ДО ТЕБ · {label.toUpperCase()}</h3><small style={{opacity:.7}}>{coords ? `сортирани по цена · ${radius} km · ${nearby.length} станции` : "Получаваме местоположението ти автоматично"}</small></div><button type="button" onClick={refreshLocation} disabled={locationLoading}>{locationLoading ? "Обновяваме…" : "Обнови"}</button></div><div className="periods nearby-periods" role="group" aria-label="Радиус за близки станции">{[5,10,25,50].map((value)=><button key={value} type="button" onClick={()=>setRadius(value)} className={radius===value?"selected":""}>{value} km</button>)}</div>{locationError ? <div className="empty">◌ {locationError}</div> : null}{nearbyLoading ? <div className="empty">◌ Търсим всички станции в радиус {radius} km…</div> : null}{!coords&&!locationLoading&&!locationError ? <div className="empty">◌ Получаваме местоположението ти автоматично…</div> : null}<div className="station-list">{nearby.length ? nearby.map((station,index)=><a key={station.id} className="station" href={station.sourceUrl} target="_blank" rel="noreferrer"><b>{String(index+1).padStart(2,"0")}</b><div><strong>{station.brand ?? station.name}</strong><span>{station.city} · {station.address}</span></div><div className="station-price"><strong>{fmt.format(station.price)}</strong><span>{station.distanceKm.toFixed(1)} км · {age(station.observedAt)}</span></div></a>):null}</div>{coords&&!nearbyLoading&&nearby.length===0&&!locationError?<div className="empty">◌ Няма станции с валидна цена в радиус {radius} km.</div>:null}<LocationMap latitude={coords?.lat??null} longitude={coords?.lon??null} radiusKm={radius} stations={nearby}/></article><article className="panel" id="changes"><div className="panel-title"><h3>ПОСЛЕДНИ ПРОМЕНИ · {label.toUpperCase()}</h3><a href="#">Цял журнал →</a></div><div className="change-list">{changes.length ? changes.slice(0,5).map((change)=><a key={change.id} className="change" href={change.sourceUrl} target="_blank"><div className={change.change>=0?"arrow rise":"arrow fall"}>{change.change>=0?"↑":"↓"}</div><div><strong>{change.station} <span>· {change.city}</span></strong><small>{fmt.format(change.oldPrice)} → {fmt.format(change.newPrice)} · {age(change.detectedAt)}</small></div><b className={change.change>=0?"rise":"fall"}>{change.change>=0?"+":""}{fmt.format(change.change)}</b></a>) : <Empty label="Ще се появят при първата открита промяна."/>}</div></article></section>
+    <section className="grid"><article className="panel" id="cheapest"><div className="panel-title"><div><h3>НАЙ-ЕВТИН ДО ТЕБ · {label.toUpperCase()}</h3><small style={{opacity:.7}}>{coords ? `сортирани по цена · ${radius} km · ${nearby.length} станции` : "Получаваме местоположението ти автоматично"}</small></div><button type="button" onClick={refreshLocation} disabled={locationLoading}>{locationLoading ? "Обновяваме…" : "Обнови"}</button></div><div className="periods nearby-periods" role="group" aria-label="Радиус за близки станции">{[5,10,25,50].map((value)=><button key={value} type="button" onClick={()=>setRadius(value)} className={radius===value?"selected":""}>{value} km</button>)}</div>{locationError ? <div className="empty">◌ {locationError}</div> : null}{nearbyLoading ? <div className="empty">◌ Търсим всички станции в радиус {radius} km…</div> : null}{!coords&&!locationLoading&&!locationError ? <div className="empty">◌ Получаваме местоположението ти автоматично…</div> : null}<div className="station-list">{nearby.length ? nearby.map((station,index)=><a key={station.id} className="station" href={station.sourceUrl} target="_blank" rel="noreferrer"><b>{String(index+1).padStart(2,"0")}</b><div><strong>{station.brand ?? station.name}</strong><span>{station.city} · {station.address}</span></div><div className="station-price"><strong>{fmt.format(station.price)}</strong><span>{station.distanceKm.toFixed(1)} км · {age(station.observedAt)}</span></div></a>):null}</div>{coords&&!nearbyLoading&&nearby.length===0&&!locationError?<div className="empty">◌ Няма станции с валидна цена в радиус {radius} km.</div>:null}<LocationMap latitude={coords?.lat??null} longitude={coords?.lon??null} radiusKm={radius} stations={nearby}/></article><article className="panel" id="changes"><div className="panel-title"><h3>ПОСЛЕДНИ НОВИНИ · {label.toUpperCase()}</h3><a href="#">Цял журнал →</a></div><div className="news-summary"><div className="news-group"><div className="news-label up">ДОБРИ НОВИНИ</div>{goodNews.length ? goodNews.map((item)=><a key={item.id} className="news-item" href={item.url} target="_blank" rel="noreferrer"><strong>{item.title}</strong><span>{item.publisher} · {age(item.publishedAt)}</span></a>) : <div className="empty">Няма достатъчно добри релевантни новини за {label}.</div>}</div><div className="news-group"><div className="news-label down">ЛОШИ НОВИНИ</div>{badNews.length ? badNews.map((item)=><a key={item.id} className="news-item" href={item.url} target="_blank" rel="noreferrer"><strong>{item.title}</strong><span>{item.publisher} · {age(item.publishedAt)}</span></a>) : <div className="empty">Няма достатъчно лоши релевантни новини за {label}.</div>}</div></div></article></section>
     <DieselForecast fuel={fuel}/><section className="insight"><div className="signal">⌁</div><div><p className="eyebrow">ПАЗАРЕН КОНТЕКСТ</p><h3>Какво движи {label.toLowerCase()}?</h3><p>Тази секция показва проверени факти от свързани пазарни източници. Причинно-следствени изводи не се правят, докато данните не са достатъчни.</p></div><span className="pending">Очаква пазарни данни</span></section><footer>FUEL TRACKER BULGARIA <span>·</span> Цените се публикуват с източник, час и индикатор за свежест.</footer>
   </main>;
 }
-function Empty({label}:{label:string}){return <div className="empty"><span>◌</span>{label}</div>;}
+function Empty({label}:{label:string}){return <div className="empty"><span>◌</span>{label}</div>;
+}
