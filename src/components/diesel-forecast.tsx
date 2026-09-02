@@ -66,13 +66,13 @@ export function DieselForecast({ fuel = "diesel" }: { fuel?: FuelKey }) {
     </div>
 
     <div className="forecast-metrics">
-      <div><span>Сега</span><strong>{fmt.format(data.current)}</strong></div>
-      <div><span>Ден {data.horizonDays}</span><strong>{fmt.format(data.expectedEnd ?? data.current)}</strong></div>
-      <div><span>Диапазон</span><strong>{fmt.format(data.expectedLow ?? data.current)} — {fmt.format(data.expectedHigh ?? data.current)}</strong></div>
+      <div><span>Сега:</span><strong>{fmt.format(data.current)}</strong></div>
+      <div><span>Ден {data.horizonDays}:</span><strong>{fmt.format(data.expectedEnd ?? data.current)}</strong></div>
+      <div><span>Диапазон:</span><strong>{fmt.format(data.expectedLow ?? data.current)} — {fmt.format(data.expectedHigh ?? data.current)}</strong></div>
       <div><span>Последен анализ</span><strong>{age(data.generatedAt)}</strong></div>
     </div>
 
-    <div className="forecast-factors">
+    <div className="forecast-factors" style={{ display: "flex", flexWrap: "wrap", gap: "0.75rem" }}>
       {data.factors.map((factor)=><span key={factor.label} className={`factor ${factor.direction.toLowerCase()}`}>{factor.direction==="UP"?"↑":factor.direction==="DOWN"?"↓":"→"} {factor.label}</span>)}
     </div>
     <p className="forecast-note">{data.explanation} Прогнозата се преизчислява при следващото обновяване на данните.</p>
