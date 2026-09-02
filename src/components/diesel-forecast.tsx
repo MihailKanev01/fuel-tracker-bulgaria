@@ -39,8 +39,7 @@ export function DieselForecast({ fuel = "diesel" }: { fuel?: FuelKey }) {
         <p className="forecast-subtitle">Базов сценарий с диапазон, а не фиксирана обещана цена.</p>
       </div>
       <div className={`forecast-direction ${data.direction.toLowerCase()}`}>
-        <strong>{directionLabel[data.direction]}</strong>
-        <span>Увереност: {confidenceLabel[data.confidence]}</span>
+        <strong>{directionLabel[data.direction]}</strong><span style={{ marginLeft: "0.75rem" }}>Увереност: {confidenceLabel[data.confidence]}</span>
       </div>
     </div>
 
