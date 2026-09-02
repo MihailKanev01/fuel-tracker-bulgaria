@@ -32,10 +32,50 @@ export function DieselForecast({ fuel = "diesel" }: { fuel?: FuelKey }) {
   if (!data?.points.length || data.current == null) return <div className="forecast-panel panel"><div className="forecast-empty">◌ Няма достатъчно проверени данни за надеждна прогноза за {fuelLabel}.</div></div>;
 
   return <section className="forecast-panel panel" id="forecast">
-    <div className="forecast-head"><div><p className="eyebrow">ОЧАКВАНА ЦЕНА · {fuelLabel.toUpperCase()}</p><h3>Следващите {data.horizonDays} дни</h3><p className="forecast-subtitle">Базов сценарий с диапазон, а не фиксирана обещана цена.</p></div><div className={`forecast-direction ${data.direction.toLowerCase()}`}><strong>{directionLabel[data.direction]}</strong><span>Увереност: {confidenceLabel[data.confidence]}</span></div></div>
-    <div className="forecast-chart"><ResponsiveContainer width="100%" height={280}><LineChart data={data.points} margin={{ top: 8, right: 12, left: 0, bottom: 8 }}><CartesianGrid vertical={false} stroke="#23302f"/><XAxis dataKey="date" tickLine={false} axisLine={false} tick={{ fill:"#778481", fontSize:11 }}/><YAxis domain={["dataMin - 0.01","dataMax + 0.01"]} tickFormatter={(value)=>`€${Number(value).toFixed(2)}`} tickLine={false} axisLine={false} tick={{fill:"#778481",fontSize:11}}/><Tooltip contentStyle={{background:"#15201f",border:"1px solid #30413e",borderRadius:10}} labelFormatter={(value)=>`Дата: ${value}`} formatter={(value,name)=>[fmt.format(Number(value)),name==="expected"?"Очаквано":name==="low"?"Нисък сценарий":"Висок сценарий"]}/><Legend wrapperStyle={{fontSize:11,color:"#899691",fontFamily:"DM Mono"}}/><Line type="monotone" dataKey="expected" name="Очаквано" stroke="#c8f65b" strokeWidth={3} dot={false}/><Line type="monotone" dataKey="low" name="Нисък сценарий" stroke="#61766c" strokeWidth={1.5} strokeDasharray="5 5" dot={false}/><Line type="monotone" dataKey="high" name="Висок сценарий" stroke="#61766c" strokeWidth={1.5} strokeDasharray="5 5" dot={false}/></LineChart></ResponsiveContainer></div>
-    <div className="forecast-metrics"><div><span>Сега</span><strong>{fmt.format(data.current)}</strong></div><div><span>Ден {data.horizonDays}</span><strong>{fmt.format(data.expectedEnd ?? data.current)}</strong></div><div><span>Диапазон</span><strong>{fmt.format(data.expectedLow ?? data.current)} — {fmt.format(data.expectedHigh ?? data.current)}</strong></div><div><span>Последен анализ</span><strong>{age(data.generatedAt)}</strong></div></div>
-    <div className="forecast-factors">{data.factors.map((factor)=><span key={factor.label} className={`factor ${factor.direction.toLowerCase()}`}>{factor.direction==="UP"?"↑":factor.direction==="DOWN"?"↓":"→"} {factor.label}</span>)}</div>
+    <div className="forecast-head">
+      <div>
+        <p className="eyebrow">ОЧАКВАНА ЦЕНА · {fuelLabel.toUpperCase()}</p>
+        <h3>Следващите {data.horizonDays} дни</h3>
+        <p className="forecast-subtitle">Базов сценарий с диапазон, а не фиксирана обещана цена.</p>
+      </div>
+      <div className={`forecast-direction ${data.direction.toLowerCase()}`}>
+        <strong>{directionLabel[data.direction]}</strong>
+        <span>Увереност: {confidenceLabel[data.confidence]}</span>
+      </div>
+    </div>
+
+    <div className="forecast-chart">
+      <ResponsiveContainer width="100%" height={280}>
+        <LineChart data={data.points} margin={{ top: 8, right: 12, left: 0, bottom: 8 }}>
+          <CartesianGrid vertical={false} stroke="#23302f"/>
+          <XAxis dataKey="date" tickLine={false} axisLine={false} tick={{ fill:"#778481", fontSize:11 }}/>
+          <YAxis domain={["dataMin - 0.01","dataMax + 0.01"]} tickFormatter={(value)=>`€${Number(value).toFixed(2)}`} tickLine={false} axisLine={false} tick={{fill:"#778481",fontSize:11}}/>
+          <Tooltip
+            contentStyle={{background:"#15201f",border:"1px solid #30413e",borderRadius:10}}
+            labelFormatter={(value) => `Дата: ${value}`}
+            formatter={(value, name) => [
+              fmt.format(Number(value)),
+              String(name),
+            ]}
+          />
+          <Legend wrapperStyle={{fontSize:11,color:"#899691",fontFamily:"DM Mono"}}/>
+          <Line type="monotone" dataKey="expected" name="Очаквано" stroke="#c8f65b" strokeWidth={3} dot={false}/>
+          <Line type="monotone" dataKey="low" name="Нисък сценарий" stroke="#61766c" strokeWidth={1.5} strokeDasharray="5 5" dot={false}/>
+          <Line type="monotone" dataKey="high" name="Висок сценарий" stroke="#61766c" strokeWidth={1.5} strokeDasharray="5 5" dot={false}/>
+        </LineChart>
+      </ResponsiveContainer>
+    </div>
+
+    <div className="forecast-metrics">
+      <div><span>Сега</span><strong>{fmt.format(data.current)}</strong></div>
+      <div><span>Ден {data.horizonDays}</span><strong>{fmt.format(data.expectedEnd ?? data.current)}</strong></div>
+      <div><span>Диапазон</span><strong>{fmt.format(data.expectedLow ?? data.current)} — {fmt.format(data.expectedHigh ?? data.current)}</strong></div>
+      <div><span>Последен анализ</span><strong>{age(data.generatedAt)}</strong></div>
+    </div>
+
+    <div className="forecast-factors">
+      {data.factors.map((factor)=><span key={factor.label} className={`factor ${factor.direction.toLowerCase()}`}>{factor.direction==="UP"?"↑":factor.direction==="DOWN"?"↓":"→"} {factor.label}</span>)}
+    </div>
     <p className="forecast-note">{data.explanation} Прогнозата се преизчислява при следващото обновяване на данните.</p>
   </section>;
 }
