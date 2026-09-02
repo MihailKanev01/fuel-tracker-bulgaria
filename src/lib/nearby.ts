@@ -26,6 +26,14 @@ const FUELO_MAP_URL = "https://bg.fuelo.net/ajax/get_gasstations_within_bounds_m
 const FUELO_INFO_URL = "https://bg.fuelo.net/ajax/get_infowindow_content";
 const asNumber = (value: { toNumber(): number } | null) => value?.toNumber() ?? null;
 
+const FUELO_FUEL_FILTERS: Record<FuelType, string> = {
+  DIESEL: "diesel",
+  GASOLINE_95: "a95",
+  GASOLINE_100: "a100",
+  LPG: "lpg",
+  CNG: "cng",
+};
+
 function haversineKm(lat1: number, lon1: number, lat2: number, lon2: number) {
   const earthRadiusKm = 6371;
   const dLat = ((lat2 - lat1) * Math.PI) / 180;
@@ -38,8 +46,11 @@ function cleanHtml(value: string) { return value.replace(/\\\\\//g, "/").replace
 function extract(pattern: RegExp, html: string) { const match = html.match(pattern); return match?.[1] ? cleanHtml(match[1]) : null; }
 function normalizeBrand(logo: string | null | undefined) { if (!logo) return null; const brands: Record<string, string> = { lukoil: "Lukoil", petrol: "Petrol", omv: "OMV", shell: "Shell", eko: "EKO", rompetrol: "Rompetrol", apid2000: "APID 2000", insa: "INSA OIL", "ek-petrol": "EK Petrol" }; return brands[logo.toLowerCase()] ?? (logo.toLowerCase() === "gasstation" ? null : logo); }
 async function fueloJson<T>(url: string, init: RequestInit): Promise<T> { const response = await fetch(url, { ...init, headers: { Accept: "application/json", "User-Agent": "FuelTrackerBG/1.0", ...(init.headers ?? {}) }, cache: "no-store", signal: AbortSignal.timeout(12000) }); if (!response.ok) throw new Error(`Fuelo request failed with ${response.status}`); return (await response.json()) as T; }
-async function fetchBoundsBox(bounds: Bounds, zoom: number) { const form = new URLSearchParams({ lat_max: String(bounds.maxLat), lon_max: String(bounds.maxLon), lat_min: String(bounds.minLat), lon_min: String(bounds.minLon), zoom: String(zoom), country: "bg", fuel: "all", brand: "all" }); return fueloJson<FueloBoundsResponse>(FUELO_MAP_URL, { method: "POST", headers: { "Content-Type": "application/x-www-form-urlencoded; charset=UTF-8" }, body: form }); }
-function radiusBounds(latitude: number, longitude: number, radiusKm: number): Bounds { const latDelta = radiusKm / 110.8; const lonDelta = radiusKm / (110.8 * Math.max(0.15, Math.cos((latitude * Math.PI) / 180))); return { minLat: latitude - latDelta, maxLat: latitude + latDelta, minLon: longitude - lonDelta, maxLon: longitude + lonDelta, depth: 0 }; }
+async function fetchBoundsBox(bounds: Bounds, zoom: number, fuelFilter: string) {
+  const form = new URLSearchParams({ lat_max: String(bounds.maxLat), lon_max: String(bounds.maxLon), lat_min: String(bounds.minLat), lon_min: String(bounds.minLon), zoom: String(zoom), country: "bg", fuel: fuelFilter, brand: "all" });
+  return fueloJson<FueloBoundsResponse>(FUELO_MAP_URL, { method: "POST", headers: { "Content-Type": "application/x-www-form-urlencoded; charset=UTF-8" }, body: form });
+}
+function radiusBounds(latitude: number, longitude: number, radiusKm: number): Bounds { const latDelta = radiusKm / 110.574; const lonDelta = radiusKm / (111.32 * Math.max(0.25, Math.cos((latitude * Math.PI) / 180))); return { minLat: latitude - latDelta, maxLat: latitude + latDelta, minLon: longitude - lonDelta, maxLon: longitude + lonDelta, depth: 0 }; }
 async function fetchInfo(id: string): Promise<FueloInfoResponse> {
   let last: FueloInfoResponse = { status: "warning" };
   for (let attempt = 0; attempt < 3; attempt += 1) {
@@ -68,29 +79,45 @@ function parseInfo(marker: FueloMarker, info: FueloInfoResponse, fuelType: FuelT
   return { id: `fuelo-${marker.id}`, name, brand: normalizeBrand(marker.logo), city: parts[parts.length - 1] ?? "България", address: parts.slice(1).join(", ") || parts[parts.length - 1] || "България", price, observedAt: new Date(), confidence: 75, sourceUrl: `https://bg.fuelo.net/gasstation/id/${encodeURIComponent(marker.id)}?lang=bg`, latitude, longitude, fuelType };
 }
 function splitBounds(bounds: Bounds): Bounds[] { const midLat = (bounds.minLat + bounds.maxLat) / 2; const midLon = (bounds.minLon + bounds.maxLon) / 2; const depth = bounds.depth + 1; return [{ minLat: bounds.minLat, maxLat: midLat, minLon: bounds.minLon, maxLon: midLon, depth }, { minLat: bounds.minLat, maxLat: midLat, minLon: midLon, maxLon: bounds.maxLon, depth }, { minLat: midLat, maxLat: bounds.maxLat, minLon: bounds.minLon, maxLon: midLon, depth }, { minLat: midLat, maxLat: bounds.maxLat, minLon: midLon, maxLon: bounds.maxLon, depth }]; }
-async function discoverNearbyMarkers(latitude: number, longitude: number, radiusKm: number) {
+async function discoverNearbyMarkers(latitude: number, longitude: number, radiusKm: number, fuelType: FuelType) {
   const unique = new Map<string, FueloMarker>();
-  let queue: Bounds[] = [radiusBounds(latitude, longitude, radiusKm)];
+  const fuelFilter = FUELO_FUEL_FILTERS[fuelType];
+  let queue: Bounds[] = [{ ...radiusBounds(latitude, longitude, radiusKm), depth: 0 }];
   const maxDepth = radiusKm <= 10 ? 4 : radiusKm <= 25 ? 3 : 2;
-  const maxDiscovered = 1000;
+  const maxDiscovered = 2500;
+
   while (queue.length && unique.size < maxDiscovered) {
-    const batch = queue.splice(0, Math.min(queue.length, 8));
-    const responses = await Promise.allSettled(batch.map((bounds) => fetchBoundsBox(bounds, bounds.depth === 0 ? 16 : 18)));
-    const next: Bounds[] = [];
-    responses.forEach((response, index) => {
-      if (response.status !== "fulfilled") return;
-      const markers = response.value.gasstations ?? [];
-      const hasDenseClusters = markers.some((marker) => !marker.id && Number(marker.cluster_count ?? 1) > 1);
-      for (const marker of markers) { if (marker.id) unique.set(marker.id, marker); }
-      if (hasDenseClusters && batch[index].depth < maxDepth) next.push(...splitBounds(batch[index]));
-    });
-    queue = [...next, ...queue];
+    const box = queue.shift()!;
+    try {
+      const response = await fetchBoundsBox(box, box.depth === 0 ? (radiusKm <= 5 ? 13 : radiusKm <= 10 ? 12 : 11) : Math.min(18, (radiusKm <= 5 ? 13 : radiusKm <= 10 ? 12 : 11) + box.depth * 2), fuelFilter);
+      const markers = response.gasstations ?? [];
+      let dense = false;
+      for (const marker of markers) {
+        if (marker.id) unique.set(marker.id, marker);
+        if (!marker.id && Number(marker.cluster_count ?? 1) > 1) dense = true;
+      }
+      if (!markers.length || dense) {
+        if (box.depth < maxDepth) queue.push(...splitBounds(box));
+      }
+      if (unique.size === 0 && fuelFilter !== "all" && !markers.length) {
+        const fallback = await fetchBoundsBox(box, box.depth === 0 ? (radiusKm <= 5 ? 13 : radiusKm <= 10 ? 12 : 11) : Math.min(18, (radiusKm <= 5 ? 13 : radiusKm <= 10 ? 12 : 11) + box.depth * 2), "all");
+        let fallbackDense = false;
+        for (const marker of fallback.gasstations ?? []) {
+          if (marker.id) unique.set(marker.id, marker);
+          if (!marker.id && Number(marker.cluster_count ?? 1) > 1) fallbackDense = true;
+        }
+        if (fallbackDense && box.depth < maxDepth) queue.push(...splitBounds(box));
+      }
+    } catch {
+      if (box.depth < maxDepth) queue.push(...splitBounds(box));
+    }
   }
+
   return [...unique.values()];
 }
 async function liveFueloNearby(latitude: number, longitude: number, radiusKm: number, limit: number, fuelType: FuelType) {
   try {
-    const markers = await discoverNearbyMarkers(latitude, longitude, radiusKm);
+    const markers = await discoverNearbyMarkers(latitude, longitude, radiusKm, fuelType);
     const candidates = markers.filter((marker) => { const lat = parseNumber(marker.lat); const lon = parseNumber(marker.lon); return lat != null && lon != null && haversineKm(latitude, longitude, lat, lon) <= radiusKm + 0.05; });
     const results: NearbyFuelStation[] = [];
     let cursor = 0;
@@ -107,7 +134,7 @@ async function liveFueloNearby(latitude: number, longitude: number, radiusKm: nu
         } catch {}
       }
     };
-    await Promise.all(Array.from({ length: Math.min(4, candidates.length) }, worker));
+    await Promise.all(Array.from({ length: Math.min(10, Math.max(1, candidates.length)) }, worker));
     return results.sort((a, b) => a.price - b.price || a.distanceKm - b.distanceKm).slice(0, limit);
   } catch { return []; }
 }
