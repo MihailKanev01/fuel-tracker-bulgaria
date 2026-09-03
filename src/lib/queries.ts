@@ -1,7 +1,15 @@
 import { FuelType } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 
-const asNumber = (value: { toNumber(): number } | null) => value?.toNumber() ?? null;
+const asNumber = (value: { toNumber(): number } | string | number | null) => {
+  if (value == null) return null;
+  if (typeof value === "number") return Number.isFinite(value) ? value : null;
+  if (typeof value === "string") {
+    const parsed = Number(value.replace(",", "."));
+    return Number.isFinite(parsed) ? parsed : null;
+  }
+  return value.toNumber();
+};
 
 export const FUEL_LABELS: Record<FuelType, string> = {
   DIESEL: "Diesel",
@@ -31,7 +39,7 @@ function median(values: number[]) {
  */
 export async function fuelOverview(fuelType: FuelType) {
   const latestRows = await prisma.$queryRaw<
-    { station_id: string; price_eur: { toNumber(): number }; observed_at: Date; confidence: number }[]
+    { station_id: string; price_eur: { toNumber(): number } | string | number; observed_at: Date; confidence: number }[]
   >`
     SELECT DISTINCT ON ("stationId")
       "stationId" as station_id,
@@ -45,8 +53,8 @@ export async function fuelOverview(fuelType: FuelType) {
   `;
 
   const values = latestRows
-    .map((item) => item.price_eur.toNumber())
-    .filter(Number.isFinite)
+    .map((item) => asNumber(item.price_eur))
+    .filter((value): value is number => value != null)
     .sort((a, b) => a - b);
 
   const sources = await prisma.source.count({
