@@ -111,11 +111,11 @@ function parseInfoWindow(
     fuel: IncomingPrice["fuel"];
     regex: RegExp;
   }> = [
-    { fuel: "DIESEL", regex: /title=["']Diesel:\s*([0-9]+(?:[.,][0-9]+)?)\s*€\/л/i },
-    { fuel: "GASOLINE_95", regex: /title=["']A95:\s*([0-9]+(?:[.,][0-9]+)?)\s*€\/л/i },
-    { fuel: "GASOLINE_100", regex: /title=["'](?:A100|Gasoline 100|100):\s*([0-9]+(?:[.,][0-9]+)?)\s*€\/л/i },
-    { fuel: "LPG", regex: /title=["']LPG:\s*([0-9]+(?:[.,][0-9]+)?)\s*€\/л/i },
-    { fuel: "CNG", regex: /title=["'](?:CNG|Methane):\s*([0-9]+(?:[.,][0-9]+)?)\s*€\/л/i },
+    { fuel: "DIESEL", regex: /title=["']Diesel\s*:\s*([0-9]+(?:[.,][0-9]+)?)(?:\s*€\/л)?/i },
+    { fuel: "GASOLINE_95", regex: /title=["'](?:A95|Gasoline 95|95)\s*:\s*([0-9]+(?:[.,][0-9]+)?)(?:\s*€\/л)?/i },
+    { fuel: "GASOLINE_100", regex: /title=["'](?:A100|Gasoline 100|100)\s*:\s*([0-9]+(?:[.,][0-9]+)?)(?:\s*€\/л)?/i },
+    { fuel: "LPG", regex: /title=["'](?:LPG|Autogas)\s*:\s*([0-9]+(?:[.,][0-9]+)?)(?:\s*€\/л)?/i },
+    { fuel: "CNG", regex: /title=["'](?:CNG|Methane|Metan)\s*:\s*([0-9]+(?:[.,][0-9]+)?)(?:\s*€\/л)?/i },
   ];
 
   for (const { fuel, regex } of fuelPatterns) {
@@ -191,7 +191,7 @@ function splitBounds(bounds: Bounds): Bounds[] {
     { latMin: bounds.latMin, latMax: latMid, lonMin: bounds.lonMin, lonMax: lonMid, zoom: nextZoom, depth: nextDepth },
     { latMin: bounds.latMin, latMax: latMid, lonMin: lonMid, lonMax: bounds.lonMax, zoom: nextZoom, depth: nextDepth },
     { latMin: latMid, latMax: bounds.latMax, lonMin: bounds.lonMin, lonMax: lonMid, zoom: nextZoom, depth: nextDepth },
-    { latMin: latMid, latMax: bounds.latMax, lonMin: lonMid, lonMax: bounds.lonMax, zoom: nextZoom, depth: nextDepth },
+    { latMin: latMid, latMax: bounds.maxLat, lonMin: lonMid, lonMax: bounds.lonMax, zoom: nextZoom, depth: nextDepth },
   ];
 }
 
@@ -298,7 +298,18 @@ export class FueloAdapter implements PriceCollector {
 
     const markers = await discoverStations(maxDepth);
     const prices = await fetchStationPrices(markers, detailLimit, concurrency);
+    const priceCounts: Record<IncomingPrice["fuel"], number> = {
+      DIESEL: 0,
+      GASOLINE_95: 0,
+      GASOLINE_100: 0,
+      LPG: 0,
+      CNG: 0,
+    };
+    for (const price of prices) priceCounts[price.fuel] += 1;
 
+    console.info(
+      `Fuelo diagnostics: Diesel=${priceCounts.DIESEL}, A95=${priceCounts.GASOLINE_95}, A100=${priceCounts.GASOLINE_100}, LPG=${priceCounts.LPG}, CNG=${priceCounts.CNG}`,
+    );
     console.info(
       `Fuelo discovered ${markers.length} individual stations and collected ${prices.length} price observations`,
     );
