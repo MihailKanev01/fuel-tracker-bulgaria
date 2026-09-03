@@ -191,7 +191,7 @@ function splitBounds(bounds: Bounds): Bounds[] {
     { latMin: bounds.latMin, latMax: latMid, lonMin: bounds.lonMin, lonMax: lonMid, zoom: nextZoom, depth: nextDepth },
     { latMin: bounds.latMin, latMax: latMid, lonMin: lonMid, lonMax: bounds.lonMax, zoom: nextZoom, depth: nextDepth },
     { latMin: latMid, latMax: bounds.latMax, lonMin: bounds.lonMin, lonMax: lonMid, zoom: nextZoom, depth: nextDepth },
-    { latMin: latMid, latMax: bounds.maxLat, lonMin: lonMid, lonMax: bounds.lonMax, zoom: nextZoom, depth: nextDepth },
+    { latMin: latMid, latMax: bounds.latMax, lonMin: lonMid, lonMax: bounds.lonMax, zoom: nextZoom, depth: nextDepth },
   ];
 }
 
