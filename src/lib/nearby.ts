@@ -97,12 +97,12 @@ function parseInfo(marker: FueloMarker, info: FueloInfoResponse, fuelType: FuelT
     CNG: ["CNG", "Methane", "Natural Gas"],
   };
   const price = labels[fuelType]
-    .map((label) => html.match(new RegExp(`title=[\\\"']${label}:\\s*([0-9]+(?:[.,][0-9]+)?)`, "i"))?.[1])
+    .map((label) => html.match(new RegExp(`title=[\\\"']${label}:[\\s]*([0-9]+(?:[.,][0-9]+)?)`, "i"))?.[1])
     .map(parseNumber)
     .find((value): value is number => value != null && value > 0);
   const latitude = parseNumber(marker.lat);
   const longitude = parseNumber(marker.lon);
-  if (!name || !location || price == null || latitude == null || longitude == null) return null;
+  if (!name || !location || latitude == null || longitude == null) return null;
   const parts = location.split(",").map((part) => part.trim()).filter(Boolean);
   return {
     id: `fuelo-${marker.id}`,
@@ -110,13 +110,14 @@ function parseInfo(marker: FueloMarker, info: FueloInfoResponse, fuelType: FuelT
     brand: normalizeBrand(marker.logo),
     city: parts[parts.length - 1] ?? "България",
     address: parts.slice(1).join(", ") || parts[parts.length - 1] || "България",
-    price,
+    price: price ?? 0,
     observedAt: new Date(),
     confidence: 75,
     sourceUrl: `https://bg.fuelo.net/gasstation/id/${encodeURIComponent(marker.id)}?lang=bg`,
     latitude,
     longitude,
     fuelType,
+    hasPrice: price != null,
   };
 }
 function splitBounds(bounds: Bounds): Bounds[] {
@@ -203,12 +204,12 @@ async function liveFueloNearby(latitude: number, longitude: number, radiusKm: nu
             latitude: parsed.latitude,
             longitude: parsed.longitude,
             distanceKm: Number(haversineKm(latitude, longitude, parsed.latitude, parsed.longitude).toFixed(2)),
-          });
+          } as NearbyFuelStation & { hasPrice: boolean });
         } catch {}
       }
     };
     await Promise.all(Array.from({ length: Math.min(10, Math.max(1, candidates.length)) }, worker));
-    return results.sort((a, b) => a.price - b.price || a.distanceKm - b.distanceKm).slice(0, limit);
+    return results;
   } catch {
     return [];
   }
