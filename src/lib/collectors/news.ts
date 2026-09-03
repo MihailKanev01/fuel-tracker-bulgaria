@@ -1,17 +1,31 @@
 import type { NewsCollector, NewsObservation } from "./types";
 
+const FRESHNESS_MS = 7 * 24 * 60 * 60 * 1000;
+
 const FEEDS = [
   {
-    publisher: "Google News · Горива България",
-    url: "https://news.google.com/rss/search?q=горива%20дизел%20цени%20България&hl=bg&gl=BG&ceid=BG:bg",
+    publisher: "Google News · Дизел",
+    url: "https://news.google.com/rss/search?q=дизел%20горива%20цени%20България%20when%3A7d&hl=bg&gl=BG&ceid=BG:bg",
+  },
+  {
+    publisher: "Google News · Бензин",
+    url: "https://news.google.com/rss/search?q=бензин%20A95%20A100%20цени%20България%20when%3A7d&hl=bg&gl=BG&ceid=BG:bg",
+  },
+  {
+    publisher: "Google News · LPG",
+    url: "https://news.google.com/rss/search?q=LPG%20автогаз%20пропан%20бутан%20цени%20България%20when%3A7d&hl=bg&gl=BG&ceid=BG:bg",
+  },
+  {
+    publisher: "Google News · CNG",
+    url: "https://news.google.com/rss/search?q=CNG%20метан%20природен%20газ%20цени%20България%20when%3A7d&hl=bg&gl=BG&ceid=BG:bg",
   },
   {
     publisher: "Google News · Петролен пазар",
-    url: "https://news.google.com/rss/search?q=петрол%20Brent%20OPEC%20цени&hl=bg&gl=BG&ceid=BG:bg",
+    url: "https://news.google.com/rss/search?q=петрол%20Brent%20OPEC%20цени%20when%3A7d&hl=bg&gl=BG&ceid=BG:bg",
   },
   {
     publisher: "Google News · Геополитика и петрол",
-    url: "https://news.google.com/rss/search?q=петрол%20Близък%20изток%20рафинерия%20санкции&hl=bg&gl=BG&ceid=BG:bg",
+    url: "https://news.google.com/rss/search?q=петрол%20Близък%20изток%20рафинерия%20санкции%20when%3A7d&hl=bg&gl=BG&ceid=BG:bg",
   },
 ];
 
@@ -55,6 +69,7 @@ function classify(title: string, summary: string) {
 function parseFeed(xml: string, fallbackPublisher: string): NewsObservation[] {
   const items = xml.match(/<item[\s\S]*?<\/item>/gi) ?? [];
   const parsed: NewsObservation[] = [];
+  const cutoff = Date.now() - FRESHNESS_MS;
 
   for (const item of items) {
     const title = tag(item, "title");
@@ -65,8 +80,9 @@ function parseFeed(xml: string, fallbackPublisher: string): NewsObservation[] {
 
     if (!title || !url) continue;
 
-    const publishedAt = pubDate ? new Date(pubDate) : new Date();
+    const publishedAt = pubDate ? new Date(pubDate) : new Date(NaN);
     if (!Number.isFinite(publishedAt.getTime())) continue;
+    if (publishedAt.getTime() < cutoff || publishedAt.getTime() > Date.now() + 5 * 60 * 1000) continue;
 
     parsed.push({
       title,
@@ -78,7 +94,7 @@ function parseFeed(xml: string, fallbackPublisher: string): NewsObservation[] {
     });
   }
 
-  return parsed.slice(0, 12);
+  return parsed;
 }
 
 export class NewsAdapter implements NewsCollector {
@@ -108,7 +124,7 @@ export class NewsAdapter implements NewsCollector {
 
         const xml = await response.text();
         const parsed = parseFeed(xml, feed.publisher);
-        console.log(`News feed ${feed.publisher}: ${parsed.length} items parsed`);
+        console.log(`News feed ${feed.publisher}: ${parsed.length} fresh items parsed`);
         all.push(...parsed);
       } catch (error) {
         console.warn(`News feed error for ${feed.publisher}:`, String(error));
