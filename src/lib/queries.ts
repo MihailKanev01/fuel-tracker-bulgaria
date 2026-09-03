@@ -38,28 +38,52 @@ function median(values: number[]) {
  * average when station observations exist.
  */
 export async function fuelOverview(fuelType: FuelType) {
-  const latestRows = await prisma.$queryRaw<
-    { station_id: string; price_eur: { toNumber(): number } | string | number; observed_at: Date; confidence: number }[]
-  >`
-    SELECT DISTINCT ON ("stationId")
-      "stationId" as station_id,
-      "priceEur" as price_eur,
-      "observedAt" as observed_at,
-      confidence
-    FROM "Price"
-    WHERE "fuelType" = ${fuelType}
-      AND anomaly = false
-    ORDER BY "stationId", "observedAt" DESC
-  `;
+  // Read station observations through Prisma instead of relying on raw SQL
+  // result typing. This keeps the production path consistent across all
+  // database environments while still selecting only the latest observation
+  // for each station below.
+  const priceRows = await prisma.price.findMany({
+    where: {
+      fuelType,
+      anomaly: false,
+    },
+    select: {
+      stationId: true,
+      priceEur: true,
+      observedAt: true,
+      confidence: true,
+    },
+    orderBy: [
+      { observedAt: "desc" },
+      { stationId: "asc" },
+    ],
+  });
 
+  const latestByStation = new Map<
+    string,
+    { priceEur: number | string | { toNumber(): number }; observedAt: Date; confidence: number }
+  >();
+
+  for (const row of priceRows) {
+    if (!latestByStation.has(row.stationId)) {
+      latestByStation.set(row.stationId, row);
+    }
+  }
+
+  const latestRows = [...latestByStation.values()];
   const values = latestRows
-    .map((item) => asNumber(item.price_eur))
+    .map((item) => asNumber(item.priceEur))
     .filter((value): value is number => value != null)
     .sort((a, b) => a - b);
 
-  const sources = await prisma.source.count({
-    where: { status: "ONLINE", lastSuccessAt: { not: null } },
-  });
+  let sources = 0;
+  try {
+    sources = await prisma.source.count({
+      where: { status: "ONLINE", lastSuccessAt: { not: null } },
+    });
+  } catch (error) {
+    console.error("Fuel overview source count failed:", error);
+  }
 
   if (!values.length) {
     return {
@@ -76,7 +100,7 @@ export async function fuelOverview(fuelType: FuelType) {
   }
 
   const latest = latestRows.reduce<Date | null>(
-    (max, item) => (!max || item.observed_at > max ? item.observed_at : max),
+    (max, item) => (!max || item.observedAt > max ? item.observedAt : max),
     null,
   );
 
