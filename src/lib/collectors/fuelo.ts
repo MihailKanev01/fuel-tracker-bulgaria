@@ -83,6 +83,21 @@ function extractFirst(pattern: RegExp, html: string): string | null {
   return match?.[1] ? decodeHtml(match[1]) : null;
 }
 
+function extractFuelAmount(html: string, patterns: RegExp[]): number | null {
+  const titleValues = Array.from(html.matchAll(/\btitle\s*=\s*["']([^"']+)["']/gi), (match) => decodeHtml(match[1]));
+  const textValue = decodeHtml(html);
+  const sources = [...titleValues, textValue];
+
+  for (const source of sources) {
+    for (const pattern of patterns) {
+      const amount = parseNumber(source.match(pattern)?.[1]);
+      if (amount != null && amount > 0) return amount;
+    }
+  }
+
+  return null;
+}
+
 function parseInfoWindow(
   marker: FueloGasStationMarker,
   info: FueloInfoResponse,
@@ -109,19 +124,41 @@ function parseInfoWindow(
 
   const fuelPatterns: Array<{
     fuel: IncomingPrice["fuel"];
-    regex: RegExp;
+    patterns: RegExp[];
   }> = [
-    { fuel: "DIESEL", regex: /title=["']Diesel\s*:\s*([0-9]+(?:[.,][0-9]+)?)(?:\s*€\/л)?/i },
-    { fuel: "GASOLINE_95", regex: /title=["'](?:A95|Gasoline 95|95)\s*:\s*([0-9]+(?:[.,][0-9]+)?)(?:\s*€\/л)?/i },
-    { fuel: "GASOLINE_100", regex: /title=["'](?:A100|Gasoline 100|100)\s*:\s*([0-9]+(?:[.,][0-9]+)?)(?:\s*€\/л)?/i },
-    { fuel: "LPG", regex: /title=["'](?:LPG|Autogas)\s*:\s*([0-9]+(?:[.,][0-9]+)?)(?:\s*€\/л)?/i },
-    { fuel: "CNG", regex: /title=["'](?:CNG|Methane|Metan)\s*:\s*([0-9]+(?:[.,][0-9]+)?)(?:\s*€\/л)?/i },
+    {
+      fuel: "DIESEL",
+      patterns: [/\b(?:Diesel|Дизел)\s*[:\-]\s*([0-9]+(?:[.,][0-9]+)?)/i],
+    },
+    {
+      fuel: "GASOLINE_95",
+      patterns: [
+        /\b(?:A95|Gasoline 95|95|Бензин 95)\s*[:\-]\s*([0-9]+(?:[.,][0-9]+)?)/i,
+      ],
+    },
+    {
+      fuel: "GASOLINE_100",
+      patterns: [
+        /\b(?:A100|Gasoline 100|100|Бензин 100)\s*[:\-]\s*([0-9]+(?:[.,][0-9]+)?)/i,
+      ],
+    },
+    {
+      fuel: "LPG",
+      patterns: [
+        /\b(?:LPG|Autogas|Газ)\s*[:\-]\s*([0-9]+(?:[.,][0-9]+)?)/i,
+      ],
+    },
+    {
+      fuel: "CNG",
+      patterns: [
+        /\b(?:CNG|Methane|Metan|Метан)\s*[:\-]\s*([0-9]+(?:[.,][0-9]+)?)/i,
+      ],
+    },
   ];
 
-  for (const { fuel, regex } of fuelPatterns) {
-    const raw = html.match(regex)?.[1];
-    const amount = parseNumber(raw);
-    if (amount == null || amount <= 0) continue;
+  for (const { fuel, patterns } of fuelPatterns) {
+    const amount = extractFuelAmount(html, patterns);
+    if (amount == null) continue;
 
     results.push({
       station: {
