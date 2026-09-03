@@ -18,7 +18,7 @@ export type NearbyFuelStation = {
 export type NearbyDieselStation = NearbyFuelStation;
 
 type FueloMarker = { id: string | null; lat: string; lon: string; logo?: string | null; cluster_count?: string | null };
-type FueloBoundsResponse = { status: string; gasstations?: FueloMarker[] };
+type FueloBoundsResponse = { status: string; count?: number; count_all?: number; gasstations?: FueloMarker[] };
 type FueloInfoResponse = { status: string; text?: string };
 type Bounds = { minLat: number; maxLat: number; minLon: number; maxLon: number; depth: number };
 
@@ -52,6 +52,18 @@ function cleanHtml(value: string) {
 function extract(pattern: RegExp, html: string) {
   const match = html.match(pattern);
   return match?.[1] ? cleanHtml(match[1]) : null;
+}
+function extractFuelAmount(html: string, patterns: RegExp[]) {
+  const titleValues = Array.from(html.matchAll(/\btitle\s*=\s*["']([^"']+)["']/gi), (match) => cleanHtml(match[1]));
+  const textValue = cleanHtml(html);
+  const sources = [...titleValues, textValue];
+  for (const source of sources) {
+    for (const pattern of patterns) {
+      const amount = parseNumber(source.match(pattern)?.[1]);
+      if (amount != null && amount > 0) return amount;
+    }
+  }
+  return null;
 }
 function normalizeBrand(logo: string | null | undefined) {
   if (!logo) return null;
@@ -89,20 +101,17 @@ function parseInfo(marker: FueloMarker, info: FueloInfoResponse, fuelType: FuelT
   const html = info.text;
   const name = extract(/<h4[^>]*>([\s\S]*?)<\/h4>/i, html);
   const location = extract(/<h5[^>]*>([\s\S]*?)<\/h5>/i, html);
-  const labels: Record<FuelType, string[]> = {
-    DIESEL: ["Diesel"],
-    GASOLINE_95: ["A95", "A-95", "Gasoline 95"],
-    GASOLINE_100: ["A100", "A-100", "A98+", "Gasoline 100"],
-    LPG: ["LPG", "Autogas", "Propane-Butane"],
-    CNG: ["CNG", "Methane", "Natural Gas"],
+  const labels: Record<FuelType, RegExp[]> = {
+    DIESEL: [/\b(?:Diesel|Дизел)\s*[:\-]\s*([0-9]+(?:[.,][0-9]+)?)/i],
+    GASOLINE_95: [/\b(?:A95|A-95|Gasoline 95|95|Бензин 95)\s*[:\-]\s*([0-9]+(?:[.,][0-9]+)?)/i],
+    GASOLINE_100: [/\b(?:A100|A-100|A98\+|Gasoline 100|100|Бензин 100)\s*[:\-]\s*([0-9]+(?:[.,][0-9]+)?)/i],
+    LPG: [/\b(?:LPG|Autogas|Propane-Butane|Пропан-Бутан|Газ)\s*[:\-]\s*([0-9]+(?:[.,][0-9]+)?)/i],
+    CNG: [/\b(?:CNG|Methane|Metan|Natural Gas|Метан)\s*[:\-]\s*([0-9]+(?:[.,][0-9]+)?)/i],
   };
-  const price = labels[fuelType]
-    .map((label) => html.match(new RegExp(`title=[\\\"']${label}:[\\s]*([0-9]+(?:[.,][0-9]+)?)`, "i"))?.[1])
-    .map(parseNumber)
-    .find((value): value is number => value != null && value > 0);
+  const price = extractFuelAmount(html, labels[fuelType]);
   const latitude = parseNumber(marker.lat);
   const longitude = parseNumber(marker.lon);
-  if (!name || !location || latitude == null || longitude == null) return null;
+  if (!name || !location || price == null || latitude == null || longitude == null) return null;
   const parts = location.split(",").map((part) => part.trim()).filter(Boolean);
   return {
     id: `fuelo-${marker.id}`,
@@ -110,14 +119,13 @@ function parseInfo(marker: FueloMarker, info: FueloInfoResponse, fuelType: FuelT
     brand: normalizeBrand(marker.logo),
     city: parts[parts.length - 1] ?? "България",
     address: parts.slice(1).join(", ") || parts[parts.length - 1] || "България",
-    price: price ?? 0,
+    price,
     observedAt: new Date(),
     confidence: 75,
     sourceUrl: `https://bg.fuelo.net/gasstation/id/${encodeURIComponent(marker.id)}?lang=bg`,
     latitude,
     longitude,
     fuelType,
-    hasPrice: price != null,
   };
 }
 function splitBounds(bounds: Bounds): Bounds[] {
@@ -145,29 +153,27 @@ async function discoverNearbyMarkers(latitude: number, longitude: number, radius
       ...batch.map((box) => fetchBoundsBox(box, "all")),
     ]);
 
-    let splitBoxes: Bounds[] = [];
-    const allResponses = [
-      ...responses.slice(0, batch.length),
-      ...responses.slice(batch.length),
-    ];
     for (let i = 0; i < batch.length; i += 1) {
       const box = batch[i];
       const specific = responses[i];
       const all = responses[batch.length + i];
-      let dense = false;
+      let shouldSplit = false;
+
       const consume = (response: PromiseSettledResult<FueloBoundsResponse>) => {
         if (response.status !== "fulfilled") return;
-        for (const marker of response.value.gasstations ?? []) {
+        const markers = response.value.gasstations ?? [];
+        const reportedCount = response.value.count_all ?? response.value.count;
+        if (reportedCount != null && reportedCount > markers.length) shouldSplit = true;
+        for (const marker of markers) {
           if (marker.id) unique.set(marker.id, marker);
-          if (!marker.id && Number(marker.cluster_count ?? 1) > 1) dense = true;
+          if (Number(marker.cluster_count ?? 1) > 1) shouldSplit = true;
         }
       };
+
       consume(specific);
       consume(all);
-      if (dense && box.depth < maxDepth) splitBoxes.push(...splitBounds(box));
+      if (shouldSplit && box.depth < maxDepth) queue.push(...splitBounds(box));
     }
-    if (!allResponses.length) splitBoxes = batch.filter((box) => box.depth < maxDepth).flatMap(splitBounds);
-    queue = [...splitBoxes, ...queue];
   }
 
   return [...unique.values()];
@@ -204,12 +210,12 @@ async function liveFueloNearby(latitude: number, longitude: number, radiusKm: nu
             latitude: parsed.latitude,
             longitude: parsed.longitude,
             distanceKm: Number(haversineKm(latitude, longitude, parsed.latitude, parsed.longitude).toFixed(2)),
-          } as NearbyFuelStation & { hasPrice: boolean });
+          });
         } catch {}
       }
     };
     await Promise.all(Array.from({ length: Math.min(10, Math.max(1, candidates.length)) }, worker));
-    return results;
+    return results.sort((a, b) => a.price - b.price || a.distanceKm - b.distanceKm).slice(0, limit);
   } catch {
     return [];
   }
