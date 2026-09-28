@@ -1,38 +1,113 @@
 # Fuel Tracker Bulgaria
 
-Production-oriented foundation for a transparent diesel-price tracker. The UI contains **no fixture data**: it only renders validated observations from PostgreSQL, and explicitly says `Няма данни` until an authorised source has supplied records.
+A production-oriented foundation for a diesel-price tracking platform focused on trustworthy, auditable observations rather than placeholder data.
 
-## Architecture
+## What it does
+
+The application is designed around a simple rule: the dashboard should show validated observations from the database and clearly distinguish missing or stale data from live information.
+
+The data flow is:
 
 ```text
-Authorised public source → isolated adapter → normalise BGN/EUR → validation/outlier rules
-    → immutable Price observations + PriceChange log (PostgreSQL/Prisma) → cached read API → Next.js dashboard
+Authorised source
+      ↓
+Source adapter
+      ↓
+Normalisation (BGN / EUR)
+      ↓
+Validation & outlier checks
+      ↓
+Immutable price observations + change log
+      ↓
+PostgreSQL / Prisma
+      ↓
+Cached API
+      ↓
+Next.js dashboard
 ```
 
-- Each data provider implements `SourceAdapter`; a failing adapter cannot stop others.
-- `ingest()` converts BGN at the fixed BGN/EUR rate, rejects implausible values, creates an immutable observation, and records every actual station-level change.
-- `Source`, `FetchRun`, original URL, timestamp, confidence and error state provide auditability.
-- The dashboard deliberately does not label stale records as live. Sources must be legally usable; check their licence, robots.txt and rate limits before configuration.
+## Engineering highlights
 
-## Local start
+- Isolated `SourceAdapter` implementations so one provider can fail without taking down the collection pipeline.
+- BGN/EUR normalisation using the fixed Bulgarian lev exchange rate.
+- Validation and outlier checks before data is persisted.
+- Immutable price observations and station-level change tracking.
+- Audit-oriented metadata such as source, original URL, timestamp, confidence and fetch state.
+- Bearer-protected collection endpoint.
+- API-first architecture with a cached read layer for the dashboard.
+- Explicit handling of missing or stale observations instead of presenting them as current prices.
 
-1. Install Node.js 20+ and PostgreSQL 16+.
-2. Copy `.env.example` to `.env` and set `DATABASE_URL`.
-3. Run `npm install`, `npm run db:generate`, `npm run db:migrate`, then `npm run dev`.
-4. After vetting a public provider, set `PUBLIC_PRICE_CSV_URL` to an authorised CSV with this header:
+## Stack
 
-   ```csv
-   name,address,city,brand,region,latitude,longitude,fuel,price,currency,observed_at,url
-   ```
+**Frontend:** Next.js, React, TypeScript  
+**Backend:** Next.js API routes  
+**Database:** PostgreSQL  
+**ORM:** Prisma  
+**Runtime:** Node.js 20+
 
-5. Schedule `npm run collect` (for example every 10–15 minutes, respecting the provider's rate limit). Alternatively POST `/api/collect` with `Authorization: Bearer <COLLECTOR_SECRET>` from a trusted scheduler.
+## API surface
 
-## API
+Implemented endpoints include:
 
-`GET /api/fuels/diesel`, `/api/fuels/diesel/history?days=30`, `/api/prices/latest`, `/api/prices/cheapest`, `/api/prices/changes`, `/api/stations`, `/api/stations/:id`, `/api/stations/:id/history`, `/api/news`, `/api/market-data`, and `/api/admin/sources` are implemented. `POST /api/collect` is bearer-protected.
+- `GET /api/fuels/diesel`
+- `GET /api/fuels/diesel/history?days=30`
+- `GET /api/prices/latest`
+- `GET /api/prices/cheapest`
+- `GET /api/prices/changes`
+- `GET /api/stations`
+- `GET /api/stations/:id`
+- `GET /api/stations/:id/history`
+- `GET /api/news`
+- `GET /api/market-data`
+- `GET /api/admin/sources`
+- `POST /api/collect`
 
-## Before deployment
+The collection endpoint is protected by a bearer secret.
 
-- Add individual adapters under `src/lib/collectors/` only for sources that explicitly permit automated access; do not scrape private/unpublished endpoints.
-- Put the collector behind a queue/scheduler with retries and per-domain rate limits, and add authentication/RBAC before exposing `/admin`.
-- Run migration review, database backups, monitoring and secrets management. For external notifications, add a verified user identity and a delivery worker before enabling alerts.
+## Local development
+
+Requirements:
+
+- Node.js 20+
+- PostgreSQL 16+
+
+Setup:
+
+```bash
+git clone https://github.com/MihailKanev01/fuel-tracker-bulgaria.git
+cd fuel-tracker-bulgaria
+
+cp .env.example .env
+npm install
+
+npm run db:generate
+npm run db:migrate
+npm run dev
+```
+
+The app can also consume an authorised CSV source with the following columns:
+
+```text
+name,address,city,brand,region,latitude,longitude,fuel,price,currency,observed_at,url
+```
+
+## Production considerations
+
+Automated collection should only be configured for sources whose terms, licence, robots policy and rate limits permit it.
+
+Before production rollout, the project should also have:
+
+- scheduled/queued collection with retries and per-domain rate limits
+- database backup and migration procedures
+- monitoring and alerting
+- secrets management
+- authentication and RBAC for administrative operations
+- a verified notification/delivery worker for alerts
+
+## Project status
+
+The repository contains the application foundation, data model, API layer and dashboard architecture. External providers must be explicitly vetted and configured before their data is collected.
+
+## License
+
+See [LICENSE](LICENSE).
