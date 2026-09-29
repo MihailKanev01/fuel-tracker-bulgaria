@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import type { NearbyStation } from "@/hooks/use-dashboard-data";
+import type { FuelKey } from "@/lib/fuel";
 import type { FavoriteStation } from "@/hooks/use-fuel-preferences";
 import { age } from "@/lib/dashboard-utils";
 import { LocationMap } from "./location-map";
@@ -34,6 +35,7 @@ function formatSaving(value: number) {
 }
 
 export function NearbyStations({
+  fuel,
   fuelLabel,
   radius,
   setRadius,
@@ -51,6 +53,7 @@ export function NearbyStations({
   onToggleFavorite,
   onUpdateFavorite,
 }: {
+  fuel: FuelKey;
   fuelLabel: string;
   radius: number;
   setRadius: (value: number) => void;
@@ -175,7 +178,11 @@ export function NearbyStations({
                   <div className="favorite-card-main">
                     <span className="favorite-star">★</span>
                     <div>
-                      <strong>{station.brand ?? station.name}</strong>
+                      <strong>
+                        <a className="station-detail-link" href={`/station/${encodeURIComponent(station.id)}?fuel=${fuel}`}>
+                          {station.brand ?? station.name}
+                        </a>
+                      </strong>
                       <small>{station.city} · {live ? age(live.observedAt) : `запазено · ${age(station.observedAt)}`}</small>
                     </div>
                   </div>
@@ -188,7 +195,7 @@ export function NearbyStations({
               );
             })}
           </div>
-          <p className="favorites-note">Любимите се пазят само на това устройство в браузъра ти.</p>
+          <p className="favorites-note">Любимите се пазят само на това устройство в браузъра ти. Отвори името за пълната история.</p>
         </div>
       ) : null}
 
@@ -312,7 +319,11 @@ export function NearbyStations({
 
               <div className="nearby-station-main">
                 <div className="nearby-station-title">
-                  <strong>{station.brand ?? station.name}</strong>
+                  <strong>
+                    <a className="station-detail-link" href={`/station/${encodeURIComponent(station.id)}?fuel=${fuel}`}>
+                      {station.brand ?? station.name}
+                    </a>
+                  </strong>
                   {isBestValue ? <span className="nearby-badge">НАЙ-ИЗГОДНА</span> : null}
                   {isCheapest ? <span className="nearby-badge muted">НАЙ-ЕВТИНА</span> : null}
                   {isNearest ? <span className="nearby-badge muted">НАЙ-БЛИЗКА</span> : null}
