@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { FuelType } from "@prisma/client";
 import { liveNearbyDiesel } from "@/lib/fuelo-live";
 import { nearbyFuel } from "@/lib/nearby";
+import { parseIntegerParam, parseNumberParam } from "@/lib/api-params";
 
 export const dynamic = "force-dynamic";
 
@@ -13,18 +14,12 @@ const aliases: Record<string, FuelType> = {
   cng: "CNG",
 };
 
-const numberParam = (value: string | null) => {
-  if (value == null || value.trim() === "") return null;
-  const parsed = Number(value);
-  return Number.isFinite(parsed) ? parsed : null;
-};
-
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
-  const lat = numberParam(searchParams.get("lat"));
-  const lon = numberParam(searchParams.get("lon"));
-  const radius = numberParam(searchParams.get("radius")) ?? 5;
-  const limit = Math.min(1000, Math.max(1, Math.round(numberParam(searchParams.get("limit")) ?? 1000)));
+  const lat = parseNumberParam(searchParams.get("lat"));
+  const lon = parseNumberParam(searchParams.get("lon"));
+  const radius = parseNumberParam(searchParams.get("radius"), 5) ?? 5;
+  const limit = parseIntegerParam(searchParams.get("limit"), 1000, 1, 1000);
   const fuel = aliases[(searchParams.get("fuel") ?? "diesel").toLowerCase()];
 
   if (!fuel) return NextResponse.json({ error: "Unsupported fuel type" }, { status: 400 });
