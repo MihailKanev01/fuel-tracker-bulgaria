@@ -257,7 +257,7 @@ export function useDashboardData({
         }
       })
       .catch((error) => {
-        if (error.name !== "AbortError") {
+        if (!(error instanceof DOMException && error.name === "AbortError")) {
           console.error("Nearby stations loading error:", error);
           setLocationError("Не успяхме да заредим близките станции.");
         }
