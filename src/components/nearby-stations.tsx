@@ -326,7 +326,7 @@ export function NearbyStations({
         {visible.map(({ station, arrivalCost, routeDistanceKm, routeDurationMin, hasRealRoute }, index) => {
           const isBestValue = bestValue?.station.id === station.id;
           const isCheapest = cheapestPrice != null && station.price === cheapestPrice;
-          const isNearest = nearest?.id === station.id;
+          const isNearest = nearest?.station.id === station.id;
 
           return (
             <div key={station.id} className="station nearby-station">
