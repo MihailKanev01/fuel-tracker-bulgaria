@@ -1463,3 +1463,7 @@ body { font-size:16px }.brand { font-size:22px }.brand i { font-size:11px } nav 
   .trip-planner-map,
   .trip-map-empty { height:360px; min-height:360px; }
 }
+
+/* Average price: higher = red, lower = green */
+.price-head .movement.up { color: var(--red); }
+.price-head .movement.down { color: var(--lime); }
