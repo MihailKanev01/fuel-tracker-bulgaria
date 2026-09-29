@@ -129,7 +129,16 @@ export function useFuelPreferences() {
 
   const updateFavoriteFromLive = useCallback((station: FavoriteStation) => {
     setFavorites((current) => {
-      if (!current.some((item) => item.id === station.id)) return current;
+      const existing = current.find((item) => item.id === station.id);
+      if (!existing) return current;
+
+      const changed =
+        existing.price !== station.price ||
+        existing.observedAt !== station.observedAt ||
+        existing.confidence !== station.confidence ||
+        existing.sourceUrl !== station.sourceUrl;
+
+      if (!changed) return current;
       return current.map((item) => item.id === station.id ? station : item);
     });
   }, []);
