@@ -147,5 +147,10 @@ model Alert {
   stationId String?
   city String?
   active Boolean @default(true)
+  lastTriggeredAt DateTime?
+  lastTriggeredPrice Decimal? @db.Decimal(7,3)
   createdAt DateTime @default(now())
+
+  @@index([userKey, active])
+  @@index([stationId, fuelType, active])
 }

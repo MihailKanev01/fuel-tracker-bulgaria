@@ -1,6 +1,7 @@
 import { Prisma, SourceKind } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { toEur, validatePrice, type IncomingPrice } from "@/lib/domain";
+import { evaluatePriceAlerts } from "@/lib/alerts";
 import type {
   MarketCollector,
   MarketObservation,
@@ -182,6 +183,12 @@ async function writePrice(item: IncomingPrice, sourceId: string) {
         sourceUrl: item.originalUrl,
       },
     });
+
+    try {
+      await evaluatePriceAlerts(station.id, item.fuel, old, priceEur);
+    } catch (alertError) {
+      console.error("Price alert evaluation failed:", alertError);
+    }
   }
 
   return true;
