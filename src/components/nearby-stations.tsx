@@ -21,15 +21,15 @@ const money2 = new Intl.NumberFormat("bg-BG", {
 
 function navigationUrl(station: NearbyStation) {
   const destination = station.latitude != null && station.longitude != null
-    ? \`\${station.latitude},\${station.longitude}\`
-    : \`\${station.name}, \${station.address}\`;
+    ? `${station.latitude},${station.longitude}`
+    : `${station.name}, ${station.address}`;
 
-  return \`https://www.google.com/maps/dir/?api=1&destination=\${encodeURIComponent(destination)}\`;
+  return `https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(destination)}`;
 }
 
 function formatSaving(value: number) {
   if (value < 0.0005) return "същата цена";
-  return \`+\${fmt.format(value)}/л спрямо най-евтината\`;
+  return `+${fmt.format(value)}/л спрямо най-евтината`;
 }
 
 export function NearbyStations({
@@ -119,7 +119,7 @@ export function NearbyStations({
           <h3>НАЙ-ИЗГОДНО ДО ТЕБ · {fuelLabel.toUpperCase()}</h3>
           <small className="nearby-meta">
             {coords
-              ? \`\${stations.length} станции · \${radius} km радиус\`
+              ? `${stations.length} станции · ${radius} km радиус`
               : "Получаваме местоположението ти автоматично"}
           </small>
         </div>
@@ -216,12 +216,12 @@ export function NearbyStations({
           </div>
           <div>
             <span>НАЙ-БЛИЗКА</span>
-            <strong>{nearest ? \`\${nearest.distanceKm.toFixed(1)} km\` : "—"}</strong>
+            <strong>{nearest ? `${nearest.distanceKm.toFixed(1)} km` : "—"}</strong>
           </div>
           <div>
             <span>НАЙ-ИЗГОДНА</span>
             <strong>{bestValue ? money2.format(bestValue.totalCost) : "—"}</strong>
-            <small>{bestValue ? \`\${bestValue.station.brand ?? bestValue.station.name} · \${quantity} L\` : ""}</small>
+            <small>{bestValue ? `${bestValue.station.brand ?? bestValue.station.name} · ${quantity} L` : ""}</small>
           </div>
         </div>
       ) : null}
@@ -275,7 +275,7 @@ export function NearbyStations({
 
       {filtered.length > 8 ? (
         <button type="button" className="nearby-more" onClick={() => setShowAll((value) => !value)}>
-          {showAll ? "Покажи по-малко" : \`Покажи още \${filtered.length - 8} станции\`}
+          {showAll ? "Покажи по-малко" : `Покажи още ${filtered.length - 8} станции`}
         </button>
       ) : null}
 
