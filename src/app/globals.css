@@ -731,3 +731,182 @@ body { font-size:16px }.brand { font-size:22px }.brand i { font-size:11px } nav 
   .station-alert-form { grid-template-columns:1fr 1fr }
   .station-alert-add { grid-column:1 / -1 }
 }
+
+/* Stage 6 · fuel calculator + my car */
+.fuel-calculator-section { margin: 0 0 35px; }
+.calculator-heading {
+  display:flex;
+  align-items:flex-end;
+  justify-content:space-between;
+  gap:24px;
+  margin:0 0 13px;
+}
+.calculator-heading h2 { margin:4px 0 8px; font-size:clamp(27px,3.4vw,40px); letter-spacing:-1.6px; }
+.calculator-heading > div:first-child > p:last-child { max-width:720px; margin:0; color:var(--muted); font-size:12px; line-height:1.55; }
+.calculator-fuel-chip {
+  min-width:180px;
+  padding:15px 17px;
+  border:1px solid #2c4037;
+  border-radius:11px;
+  background:linear-gradient(145deg,#14211d,#101917);
+  text-align:right;
+}
+.calculator-fuel-chip span,
+.calculator-fuel-chip small { display:block; color:#72817a; font:9px 'DM Mono'; }
+.calculator-fuel-chip strong { display:block; margin:6px 0 3px; color:var(--lime); font-size:25px; letter-spacing:-1px; }
+.calculator-grid { display:grid; grid-template-columns:minmax(0,1fr) minmax(0,1fr); gap:13px; }
+.car-profile,
+.trip-calculator { min-width:0; }
+.car-fields {
+  display:grid;
+  grid-template-columns:1.4fr .8fr .8fr .9fr;
+  gap:9px;
+  margin-top:13px;
+}
+.car-fields label > span,
+.trip-top label > span,
+.price-field > span {
+  display:block;
+  margin:0 0 6px;
+  color:#788780;
+  font:9px 'DM Mono';
+  text-transform:uppercase;
+  letter-spacing:.45px;
+}
+.car-fields label > input,
+.calculator-input,
+.trip-check button {
+  width:100%;
+  min-height:39px;
+  border:1px solid #30433b;
+  border-radius:9px;
+  background:#111a17;
+  color:#dbe5df;
+  font:11px 'DM Mono';
+  box-sizing:border-box;
+}
+.car-fields label > input {
+  padding:9px 10px;
+  outline:0;
+}
+.car-fields label > input:focus,
+.calculator-input:focus-within { border-color:#52694b; }
+.calculator-input {
+  display:flex;
+  align-items:center;
+  overflow:hidden;
+}
+.calculator-input input {
+  width:100%;
+  min-width:0;
+  padding:9px 10px;
+  border:0;
+  outline:0;
+  background:transparent;
+  color:#dbe5df;
+  font:11px 'DM Mono';
+}
+.calculator-input b { padding-right:10px; color:#77867f; font:9px 'DM Mono'; white-space:nowrap; }
+.car-profile-note {
+  display:grid;
+  gap:4px;
+  margin-top:12px;
+  padding-top:11px;
+  border-top:1px solid var(--line);
+}
+.car-profile-note strong { font-size:12px; }
+.car-profile-note span { color:#687971; font:9px/1.55 'DM Mono'; }
+.trip-top { display:grid; grid-template-columns:1fr 1.35fr; gap:9px; margin-top:13px; }
+.trip-check button {
+  appearance:none;
+  padding:0 10px;
+  cursor:pointer;
+}
+.trip-check button.selected {
+  border-color:#52694b;
+  background:#243321;
+  color:var(--lime);
+}
+.price-field { display:block; margin-top:10px; }
+.calculator-price strong { font-size:12px; }
+.calculator-quick-price {
+  display:block;
+  width:100%;
+  margin-top:8px;
+  padding:8px 10px;
+  border:1px solid #2c4037;
+  border-radius:8px;
+  background:#13201b;
+  color:#95a29c;
+  text-align:left;
+  cursor:pointer;
+  font:9px/1.4 'DM Mono';
+}
+.calculator-quick-price strong { color:var(--lime); }
+.calculator-quick-price:hover { border-color:#607d6d; color:#c6d4cd; }
+.calculator-result-grid {
+  display:grid;
+  grid-template-columns:1fr 1fr;
+  gap:8px;
+  margin-top:12px;
+}
+.calculator-result-grid > div,
+.calculator-metric {
+  padding:13px 14px;
+  border:1px solid #26382f;
+  border-radius:9px;
+  background:#111a17;
+}
+.calculator-result-grid span,
+.calculator-metric > span,
+.calculator-metric small {
+  display:block;
+  color:#718079;
+  font:9px 'DM Mono';
+}
+.calculator-result-grid strong {
+  display:block;
+  margin-top:6px;
+  color:#d9e5df;
+  font-size:18px;
+  letter-spacing:-.5px;
+}
+.calculator-bottom-grid {
+  display:grid;
+  grid-template-columns:repeat(3,1fr);
+  gap:13px;
+  margin-top:13px;
+}
+.calculator-metric strong {
+  display:block;
+  margin:7px 0 4px;
+  color:var(--lime);
+  font-size:24px;
+  letter-spacing:-1px;
+}
+:root[data-theme="light"] .calculator-fuel-chip,
+:root[data-theme="light"] .calculator-result-grid > div,
+:root[data-theme="light"] .calculator-metric,
+:root[data-theme="light"] .car-profile,
+:root[data-theme="light"] .trip-calculator { background:linear-gradient(145deg,#ffffff,#f7faf8); border-color:#d8e3de; }
+:root[data-theme="light"] .calculator-fuel-chip strong,
+:root[data-theme="light"] .calculator-metric strong { color:#5f820d; }
+:root[data-theme="light"] .car-fields label > input,
+:root[data-theme="light"] .calculator-input,
+:root[data-theme="light"] .trip-check button {
+  background:#f8fbf9;
+  border-color:#d2dfd8;
+  color:#34433e;
+}
+:root[data-theme="light"] .calculator-quick-price { background:#f3f8f5; border-color:#d2dfd8; color:#62716b; }
+:root[data-theme="light"] .trip-check button.selected { background:#eaf3df; border-color:#c5d5b8; color:#5f820d; }
+@media (max-width:760px) {
+  .calculator-heading { align-items:stretch; flex-direction:column; gap:13px; }
+  .calculator-fuel-chip { min-width:0; text-align:left; }
+  .calculator-grid { grid-template-columns:1fr; }
+  .car-fields { grid-template-columns:1fr 1fr; }
+  .car-fields label:first-child { grid-column:1 / -1; }
+  .trip-top { grid-template-columns:1fr 1fr; }
+  .calculator-bottom-grid { grid-template-columns:1fr; gap:8px; }
+  .calculator-result-grid strong { font-size:16px; }
+}
