@@ -11,6 +11,7 @@ import { NearbyStations } from "./nearby-stations";
 import { useFuelPreferences } from "@/hooks/use-fuel-preferences";
 import { AlertCenter } from "./alert-center";
 import { FuelCalculator } from "./fuel-calculator";
+import { TripPlanner } from "./trip-planner";
 
 const fmt = new Intl.NumberFormat("bg-BG", { style: "currency", currency: "EUR", minimumFractionDigits: 3 });
 
@@ -63,7 +64,7 @@ export function Dashboard() {
   );
 
 return <main className="shell">
-    <header><a className="brand" href="/">Fuel<span>Tracker</span><i>BG</i></a><nav><a className="active" href="#overview">Обзор</a><a href="#cheapest">Най-евтин</a><a href="#changes">Промени</a><a href="/admin">Админ</a></nav><div className="header-actions"><ThemeToggle /><button className="live"><b /> Данни на живо</button></div></header>
+    <header><a className="brand" href="/">Fuel<span>Tracker</span><i>BG</i></a><nav><a className="active" href="#overview">Обзор</a><a href="#cheapest">Най-евтин</a><a href="#changes">Промени</a><a href="#trip">Пътуване</a><a href="/admin">Админ</a></nav><div className="header-actions"><ThemeToggle /><button className="live"><b /> Данни на живо</button></div></header>
     <section className="fuel-selector-section"><div><p className="eyebrow">ИЗБЕРИ ГОРИВО</p><div className="fuel-selector">{FUEL_OPTIONS.map((option) => <button key={option.key} type="button" className={fuel === option.key ? "selected" : ""} onClick={() => setFuel(option.key)}>{option.label}</button>)}</div></div></section>
     {dataError ? <div className="empty" role="status">◌ {dataError}</div> : null}
     <section className="hero" id="overview"><div><p className="eyebrow">БЪЛГАРИЯ · {label.toUpperCase()}</p><h1>Цената на <em>{label.toLowerCase()},</em><br />без догадки.</h1><p className="lede">Показваме само проследими цени с посочен източник и време на наблюдение.</p></div><div className="hero-chip"><span>Надеждност</span><strong>{overview?.confidence ?? "—"}{overview?.confidence != null && "%"}</strong><small>{overview?.stationCount ?? 0} валидни обекта</small></div></section>
@@ -101,6 +102,13 @@ return <main className="shell">
       cheapestNearbyName={cheapestNearby ? (cheapestNearby.brand ?? cheapestNearby.name) : null}
       quantity={quantity}
       consumption={consumption}
+    />
+    <TripPlanner
+      coords={coords}
+      fuel={fuel}
+      quantity={quantity}
+      consumption={consumption}
+      fuelLabel={label}
     />
     <section className="insight"><div className="signal">⌁</div><div><p className="eyebrow">ПАЗАРЕН КОНТЕКСТ</p><h3>Какво движи {label.toLowerCase()}?</h3><p>Тази секция показва проверени факти от свързани пазарни източници. Причинно-следствени изводи не се правят, докато данните не са достатъчни.</p></div><span className="pending">Очаква пазарни данни</span></section><footer>FUEL TRACKER BULGARIA <span>·</span> Цените се публикуват с източник, час и индикатор за свежест.</footer>
   </main>;
