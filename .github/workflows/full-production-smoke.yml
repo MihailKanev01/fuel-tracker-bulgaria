@@ -1,0 +1,156 @@
+name: Full production smoke test
+on:
+  push:
+    branches:
+      - test/full-production-smoke-2026-09-29
+jobs:
+  smoke:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Run production smoke tests
+        run: node <<'NODE'
+const BASE = "https://fuel-tracker-bulgaria.vercel.app";
+const results = [];
+let failures = 0;
+
+async function request(path, options = {}) {
+  const res = await fetch(BASE + path, {
+    redirect: "manual",
+    ...options,
+    headers: {
+      accept: "application/json, text/html",
+      ...(options.body ? {"content-type": "application/json"} : {}),
+      ...(options.headers || {}),
+    },
+  });
+  let body = "";
+  try { body = await res.text(); } catch {}
+  let json = null;
+  try { json = JSON.parse(body); } catch {}
+  return { status: res.status, headers: res.headers, body, json };
+}
+
+function test(name, ok, detail = "") {
+  if (!ok) failures++;
+  results.push({ name, ok, detail });
+  console.log((ok ? "PASS " : "FAIL ") + name + (detail ? " — " + detail : ""));
+}
+
+const home = await request("/");
+test("homepage 200", home.status === 200, "HTTP " + home.status);
+test("homepage contains app title", home.body.includes("Fuel Tracker Bulgaria"), "title present");
+test("homepage contains average-price section", home.body.includes("СРЕДНА ЦЕНА"), "section present");
+
+const fuelPaths = ["/api/fuels/diesel","/api/fuels/a95","/api/fuels/a100","/api/fuels/lpg","/api/fuels/cng"];
+for (const path of fuelPaths) {
+  const r = await request(path);
+  test(path + " 200", r.status === 200 && r.json && typeof r.json.average === "number" && typeof r.json.lowest === "number", "HTTP " + r.status);
+}
+
+const historyPaths = ["/api/fuels/diesel/history?days=30","/api/fuels/a95/history?days=30","/api/fuels/a100/history?days=30","/api/fuels/lpg/history?days=30","/api/fuels/cng/history?days=30"];
+for (const path of historyPaths) {
+  const r = await request(path);
+  test(path + " 200 + history", r.status === 200 && Array.isArray(r.json) && r.json.length > 0, "rows=" + (Array.isArray(r.json) ? r.json.length : -1));
+}
+
+for (const fuel of ["diesel","a95","a100","lpg","cng"]) {
+  const r = await request("/api/fuels/" + fuel + "/forecast");
+  test("forecast " + fuel, r.status === 200 && r.json && Array.isArray(r.json.points) && r.json.points.length >= 7, "HTTP " + r.status);
+}
+
+for (const path of ["/api/prices/latest","/api/prices/cheapest?limit=5","/api/prices/changes?fuel=diesel","/api/prices/changes?fuel=a95","/api/stations","/api/news","/api/market-data","/api/news/summary"]) {
+  const r = await request(path);
+  test(path + " 200", r.status === 200, "HTTP " + r.status);
+}
+
+const stations = await request("/api/stations");
+const stationId = Array.isArray(stations.json) && stations.json[0]?.id;
+test("station list has id", Boolean(stationId), "id=" + stationId);
+
+if (stationId) {
+  const detail = await request("/api/stations/" + encodeURIComponent(stationId));
+  const hist = await request("/api/stations/" + encodeURIComponent(stationId) + "/history?fuel=diesel&days=30");
+  test("station detail 200", detail.status === 200 && detail.json && detail.json.id === stationId, "HTTP " + detail.status);
+  test("station history 200", hist.status === 200 && Array.isArray(hist.json) && hist.json.length > 0, "rows=" + (Array.isArray(hist.json) ? hist.json.length : -1));
+}
+
+const nearby = await request("/api/prices/nearby?lat=43.2141&lon=27.9147&radius=10&limit=10&fuel=diesel");
+test("nearby Varna 200", nearby.status === 200 && Array.isArray(nearby.json) && nearby.json.length > 0, "rows=" + (Array.isArray(nearby.json) ? nearby.json.length : -1));
+
+const badNearby = await request("/api/prices/nearby?lat=99&lon=999&radius=10&limit=10&fuel=diesel");
+test("nearby rejects invalid coords", badNearby.status === 400, "HTTP " + badNearby.status);
+
+const badFuel = await request("/api/prices/changes?fuel=nope");
+test("changes rejects invalid fuel", badFuel.status === 400, "HTTP " + badFuel.status);
+
+for (const path of ["/api/geocode","/api/route","/api/routing","/api/trip"]) {
+  const r = await request(path);
+  test(path + " rejects GET", r.status === 405, "HTTP " + r.status);
+}
+
+const geoBad = await request("/api/geocode", {method:"POST", body:JSON.stringify({query:""})});
+test("geocode validates empty query", geoBad.status === 400, "HTTP " + geoBad.status);
+
+const routeBad = await request("/api/route", {method:"POST", body:JSON.stringify({origin:{lat:99,lon:0},destination:{lat:43,lon:28}})});
+test("route validates coordinates", routeBad.status === 400, "HTTP " + routeBad.status);
+
+const routingBad = await request("/api/routing", {method:"POST", body:JSON.stringify({origin:{lat:99,lon:0},destinations:[]})});
+test("routing validates input", routingBad.status === 400, "HTTP " + routingBad.status);
+
+const tripBad = await request("/api/trip", {method:"POST", body:JSON.stringify({origin:{lat:43,lon:28}})});
+test("trip validates input", tripBad.status === 400, "HTTP " + tripBad.status);
+
+const userKey = "11111111-1111-4111-8111-111111111111";
+const alertBad = await request("/api/alerts", {method:"POST",body:JSON.stringify({kind:"NOPE",fuelType:"DIESEL",threshold:1,stationId:stationId || ""})});
+test("alerts rejects invalid input", alertBad.status === 400, "HTTP " + alertBad.status);
+
+if (stationId) {
+  const created = await request("/api/alerts", {
+    method:"POST",
+    headers:{"x-fueltracker-user-key":userKey},
+    body:JSON.stringify({kind:"PRICE_BELOW",fuelType:"DIESEL",threshold:3.5,stationId})
+  });
+  const createdId = created.json?.id;
+  test("alerts create 201", created.status === 201 && typeof createdId === "string", "HTTP " + created.status);
+  const listed = await request("/api/alerts", {headers:{"x-fueltracker-user-key":userKey}});
+  test("alerts list 200", listed.status === 200 && Array.isArray(listed.json), "HTTP " + listed.status);
+  if (createdId) {
+    const removed = await request("/api/alerts/" + encodeURIComponent(createdId), {method:"DELETE",headers:{"x-fueltracker-user-key":userKey}});
+    test("alerts delete 200", removed.status === 200 && removed.json?.ok === true, "HTTP " + removed.status);
+  }
+}
+
+const debug = await request("/api/debug/db");
+test("debug db blocked in production", debug.status === 404, "HTTP " + debug.status);
+
+const admin = await request("/api/admin/sources");
+test("admin API requires auth", admin.status === 401, "HTTP " + admin.status);
+
+const adminPage = await request("/admin");
+test("admin page requires auth", adminPage.status === 401, "HTTP " + adminPage.status);
+
+const cron = await request("/api/cron/collect");
+test("cron requires bearer auth", cron.status === 401, "HTTP " + cron.status);
+
+const collect = await request("/api/collect", {method:"POST", body:JSON.stringify({})});
+test("collector requires bearer auth", collect.status === 401, "HTTP " + collect.status);
+
+const tripGood = await request("/api/trip", {
+  method:"POST",
+  body:JSON.stringify({
+    origin:{lat:43.2141,lon:27.9147},
+    destination:{lat:43.242,lon:27.82},
+    fuel:"diesel",
+    quantity:20,
+    consumption:7
+  })
+});
+test("trip planner live POST", tripGood.status === 200 && tripGood.json && tripGood.json.baseRoute && Array.isArray(tripGood.json.alternatives), "HTTP " + tripGood.status + " alternatives=" + (tripGood.json?.alternatives?.length ?? -1));
+
+console.log(JSON.stringify({failures, results}, null, 2));
+if (failures) process.exit(1);
+NODE
