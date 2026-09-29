@@ -4,17 +4,10 @@ import { prisma } from "@/lib/prisma";
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
 
-function safeHost() {
-  const raw = process.env.DATABASE_URL;
-  if (!raw) return null;
-  try {
-    return new URL(raw).hostname;
-  } catch {
-    return "INVALID_DATABASE_URL";
-  }
-}
-
 export async function GET() {
+  if (process.env.NODE_ENV === "production") {
+    return NextResponse.json({ error: "Not found" }, { status: 404 });
+  }
   try {
     const groups = await prisma.price.groupBy({
       by: ["fuelType", "anomaly"],
