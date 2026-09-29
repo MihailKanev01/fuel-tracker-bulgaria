@@ -3,6 +3,9 @@ on:
   push:
     branches:
       - feature/stage-7-routing
+  pull_request:
+    branches:
+      - main
   workflow_dispatch:
 
 jobs:
