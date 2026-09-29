@@ -59,6 +59,7 @@ Implemented endpoints include:
 - `GET /api/stations/:id/history`
 - `GET /api/news`
 - `GET /api/market-data`
+- `POST /api/routing` — real road distances and estimated travel times to nearby stations
 - `GET /api/admin/sources`
 - `POST /api/collect`
 
@@ -100,8 +101,11 @@ Set these environment variables before deploying:
 - `COLLECTOR_SECRET` — protects the manual `POST /api/collect` endpoint.
 - `CRON_SECRET` — protects the scheduled `GET /api/cron/collect` endpoint. The cron endpoint fails closed when this is missing.
 - `ADMIN_USER` and `ADMIN_PASSWORD` — HTTP Basic Auth credentials for `/admin` and `/api/admin/*` in production.
+- `ROUTING_URL` — optional OSRM-compatible routing endpoint; defaults to the public OSRM endpoint.
 
 The database debug endpoint `/api/debug/db` is development-only and returns 404 in production.
+
+The nearby-station view uses an OSRM-compatible road matrix for up to 20 candidate stations at a time. When the routing provider is unavailable, the UI falls back to the existing geographic distance so the nearby list remains usable.
 
 ## Production considerations
 
