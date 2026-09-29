@@ -144,7 +144,7 @@ export function NearbyStations({
     });
   }, [brandFilter, enriched, sortMode]);
 
-  const visible = showAll ? filtered : filtered.slice(0, 8);
+  const visible = showAll ? filtered : filtered.slice(0, 6);
 
   const bestValue = enriched.length
     ? [...enriched].sort((a, b) => a.totalCost - b.totalCost || a.station.price - b.station.price)[0]
@@ -238,42 +238,45 @@ export function NearbyStations({
         </div>
       </div>
 
-      <div className="nearby-settings">
-        <label>
-          <span>Количество</span>
-          <div className="nearby-input">
-            <input
-              type="number"
-              min={5}
-              max={120}
-              step={1}
-              value={quantity}
-              onChange={(event) => setQuantity(Math.min(120, Math.max(5, Number(event.target.value) || 5)))}
-            />
-            <b>L</b>
-          </div>
-        </label>
+      <details className="nearby-options">
+        <summary>⚙ Настройки за изчислението <span>{quantity} L · {consumption.toFixed(1)} L/100 km</span></summary>
+        <div className="nearby-settings">
+          <label>
+            <span>Количество</span>
+            <div className="nearby-input">
+              <input
+                type="number"
+                min={5}
+                max={120}
+                step={1}
+                value={quantity}
+                onChange={(event) => setQuantity(Math.min(120, Math.max(5, Number(event.target.value) || 5)))}
+              />
+              <b>L</b>
+            </div>
+          </label>
 
-        <label>
-          <span>Разход</span>
-          <div className="nearby-input">
-            <input
-              type="number"
-              min={3}
-              max={30}
-              step={0.1}
-              value={consumption}
-              onChange={(event) => setConsumption(Math.min(30, Math.max(3, Number(event.target.value) || 3)))}
-            />
-            <b>L/100</b>
-          </div>
-        </label>
+          <label>
+            <span>Разход</span>
+            <div className="nearby-input">
+              <input
+                type="number"
+                min={3}
+                max={30}
+                step={0.1}
+                value={consumption}
+                onChange={(event) => setConsumption(Math.min(30, Math.max(3, Number(event.target.value) || 3)))}
+              />
+              <b>L/100</b>
+            </div>
+          </label>
 
-        <div className="nearby-setting-note">
-          <strong>Как смятаме „най-изгодна“?</strong>
-          <span>Цена за {quantity} L + ориентировъчен разход за достигане до станцията.</span>
+          <div className="nearby-setting-note">
+            <strong>Как смятаме „най-изгодна“?</strong>
+            <span>Цена за {quantity} L + ориентировъчен разход за достигане до станцията.</span>
+          </div>
         </div>
-      </div>
+      </details>
 
       {brands.length > 0 ? (
         <div className="nearby-brands" aria-label="Филтър по марка">
@@ -384,11 +387,16 @@ export function NearbyStations({
 
       {filtered.length > 8 ? (
         <button type="button" className="nearby-more" onClick={() => setShowAll((value) => !value)}>
-          {showAll ? "Покажи по-малко" : `Покажи още ${filtered.length - 8} станции`}
+          {showAll ? "Покажи по-малко" : `Покажи още ${filtered.length - 6} станции`}
         </button>
       ) : null}
 
-      <LocationMap latitude={coords?.lat ?? null} longitude={coords?.lon ?? null} radiusKm={radius} stations={stations} />
+      <details className="nearby-map-disclosure">
+        <summary>Карта на станциите <span>{stations.length} обекта</span></summary>
+        <div className="nearby-map-body">
+          <LocationMap latitude={coords?.lat ?? null} longitude={coords?.lon ?? null} radiusKm={radius} stations={stations} />
+        </div>
+      </details>
 
       <p className="nearby-disclaimer">
         Любимите, количеството и разходът се запазват автоматично за следващото отваряне на сайта.
