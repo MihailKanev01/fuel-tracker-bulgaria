@@ -66,6 +66,7 @@ return <main className="shell">
     </section>
     <section className="stats">{[["Средна", overview?.average],["Най-ниска", overview?.lowest],["Най-висока", overview?.highest],["Медианна", overview?.median]].map(([labelText, value]) => <article key={String(labelText)}><span>{labelText}</span><strong>{typeof value === "number" ? fmt.format(value) : "—"}</strong><small>без аномални стойности</small></article>)}</section>
     <section className="grid">      <NearbyStations
+        fuel={fuel}
         fuelLabel={label}
         radius={radius}
         setRadius={setRadius}
