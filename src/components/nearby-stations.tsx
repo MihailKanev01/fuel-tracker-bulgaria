@@ -7,6 +7,7 @@ import type { FavoriteStation } from "@/hooks/use-fuel-preferences";
 import { age } from "@/lib/dashboard-utils";
 import { LocationMap } from "./location-map";
 import { useRouteMatrix } from "@/hooks/use-route-matrix";
+import { RoutePreview } from "./route-preview";
 
 type SortMode = "price" | "distance" | "value";
 
@@ -364,9 +365,18 @@ export function NearbyStations({
                 <small>{hasRealRoute && routeDurationMin != null ? Math.round(routeDurationMin) + " мин · " : ""}до станцията ≈ {money2.format(arrivalCost)}</small>
               </div>
 
-              <a className="nearby-nav" href={navigationUrl(station)} target="_blank" rel="noreferrer">
-                Навигирай →
-              </a>
+              <div className="nearby-actions">
+                <RoutePreview
+                  station={station}
+                  coords={coords}
+                  fuel={fuel}
+                  fuelLabel={fuelLabel}
+                  consumption={consumption}
+                />
+                <a className="nearby-nav" href={navigationUrl(station)} target="_blank" rel="noreferrer">
+                  Навигирай →
+                </a>
+              </div>
             </div>
           );
         })}

@@ -927,3 +927,199 @@ body { font-size:16px }.brand { font-size:22px }.brand i { font-size:11px } nav 
   background:#f7faf8;
   color:#65746e;
 }
+
+/* Stage 8 · route preview */
+.nearby-actions {
+  display:flex;
+  align-items:center;
+  gap:6px;
+  align-self:center;
+  flex-wrap:wrap;
+  justify-content:flex-end;
+}
+.route-preview-button {
+  appearance:none;
+  border:1px solid #395044;
+  border-radius:8px;
+  background:#16231e;
+  color:#b9c9c1;
+  padding:8px 9px;
+  cursor:pointer;
+  font:9px 'DM Mono';
+  white-space:nowrap;
+}
+.route-preview-button:hover:not(:disabled) {
+  color:var(--lime);
+  border-color:#607d6d;
+  background:#1a2b24;
+}
+.route-preview-button:disabled {
+  opacity:.45;
+  cursor:not-allowed;
+}
+.route-modal-backdrop {
+  position:fixed;
+  inset:0;
+  z-index:4000;
+  display:grid;
+  place-items:center;
+  padding:18px;
+  background:rgba(4,9,8,.78);
+  backdrop-filter:blur(10px);
+}
+.route-modal {
+  width:min(980px,100%);
+  max-height:min(920px,calc(100vh - 36px));
+  overflow:auto;
+  border:1px solid #395044;
+  border-radius:16px;
+  background:linear-gradient(145deg,#17221f,#0f1715);
+  box-shadow:0 35px 100px rgba(0,0,0,.58);
+  padding:18px;
+}
+.route-modal-head {
+  display:flex;
+  align-items:flex-start;
+  justify-content:space-between;
+  gap:18px;
+  margin-bottom:12px;
+}
+.route-kicker {
+  color:#91aa9f;
+  font:9px 'DM Mono';
+  letter-spacing:1.2px;
+}
+.route-modal-head h3 {
+  margin:6px 0 4px;
+  font-size:23px;
+  letter-spacing:-.7px;
+}
+.route-modal-head p {
+  margin:0;
+  color:#788780;
+  font:10px/1.5 'DM Mono';
+}
+.route-modal-close {
+  width:34px;
+  height:34px;
+  flex:0 0 auto;
+  border:1px solid #395044;
+  border-radius:50%;
+  background:#14201b;
+  color:#afbbb6;
+  cursor:pointer;
+  font-size:18px;
+}
+.route-modal-close:hover { color:var(--lime); border-color:#607d6d; }
+.route-preview-map {
+  height:420px;
+  overflow:hidden;
+  border:1px solid #293a34;
+  border-radius:11px;
+  background:#111a18;
+}
+.route-map-placeholder {
+  height:420px;
+  display:grid;
+  place-items:center;
+  border:1px solid #293a34;
+  border-radius:11px;
+  background:linear-gradient(135deg,#141f1d,#101817);
+  color:#84938c;
+  font:11px 'DM Mono';
+  text-align:center;
+  padding:20px;
+  box-sizing:border-box;
+}
+.route-map-error { color:#a89c94; }
+.route-summary {
+  display:grid;
+  grid-template-columns:repeat(3,1fr);
+  gap:8px;
+  margin-top:10px;
+}
+.route-summary > div {
+  padding:12px 13px;
+  border:1px solid #283a33;
+  border-radius:9px;
+  background:#111a17;
+}
+.route-summary span,
+.route-summary small {
+  display:block;
+  color:#718079;
+  font:8px 'DM Mono';
+}
+.route-summary strong {
+  display:block;
+  margin:6px 0 3px;
+  color:var(--lime);
+  font-size:20px;
+  letter-spacing:-.6px;
+}
+.route-navigation-links {
+  display:flex;
+  align-items:center;
+  gap:7px;
+  flex-wrap:wrap;
+  margin-top:10px;
+  padding-top:11px;
+  border-top:1px solid #25362f;
+}
+.route-navigation-links > span {
+  margin-right:3px;
+  color:#718079;
+  font:8px 'DM Mono';
+}
+.route-navigation-links a {
+  border:1px solid #395044;
+  border-radius:8px;
+  padding:7px 9px;
+  background:#13201b;
+  color:#c6d4cd;
+  text-decoration:none;
+  font:9px 'DM Mono';
+}
+.route-navigation-links a:hover {
+  color:var(--lime);
+  border-color:#607d6d;
+  background:#1a2b24;
+}
+.route-modal-note {
+  margin:10px 0 0;
+  color:#5f6f68;
+  font:8px/1.55 'DM Mono';
+}
+:root[data-theme="light"] .route-preview-button {
+  background:#f7fbf8;
+  border-color:#c9d8d0;
+  color:#53635d;
+}
+:root[data-theme="light"] .route-modal-backdrop { background:rgba(18,27,24,.48); }
+:root[data-theme="light"] .route-modal {
+  background:linear-gradient(145deg,#ffffff,#f7faf8);
+  border-color:#d5e1db;
+}
+:root[data-theme="light"] .route-modal-close,
+:root[data-theme="light"] .route-navigation-links a,
+:root[data-theme="light"] .route-summary > div {
+  background:#f7fbf8;
+  border-color:#d2dfd8;
+  color:#4e5e57;
+}
+:root[data-theme="light"] .route-preview-map,
+:root[data-theme="light"] .route-map-placeholder { border-color:#d2dfd8; background:#f7faf8; }
+@media (max-width:760px) {
+  .nearby-actions {
+    grid-column:2 / -1;
+    width:100%;
+    justify-content:flex-end;
+    margin-top:-1px;
+  }
+  .route-modal-backdrop { padding:8px; }
+  .route-modal { padding:12px; border-radius:13px; }
+  .route-preview-map,
+  .route-map-placeholder { height:320px; }
+  .route-summary { grid-template-columns:1fr 1fr; }
+  .route-summary > div:last-child { grid-column:1 / -1; }
+}
