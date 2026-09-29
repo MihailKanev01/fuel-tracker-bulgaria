@@ -4,6 +4,9 @@ import { useMemo, useState } from "react";
 import { Area, AreaChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { useDashboardData } from "@/hooks/use-dashboard-data";
 import { age } from "@/lib/dashboard-utils";
+import { LocationMap } from "./location-map";
+import { DieselForecast } from "./diesel-forecast";
+import { ThemeToggle } from "./theme-toggle";
 import { FUEL_OPTIONS, type FuelKey } from "@/lib/fuel";
 
 const fmt = new Intl.NumberFormat("bg-BG", { style: "currency", currency: "EUR", minimumFractionDigits: 3 });
