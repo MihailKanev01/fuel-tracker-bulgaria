@@ -6,6 +6,7 @@ import type { FuelKey } from "@/lib/fuel";
 import type { FavoriteStation } from "@/hooks/use-fuel-preferences";
 import { age } from "@/lib/dashboard-utils";
 import { LocationMap } from "./location-map";
+import { useRouteMatrix } from "@/hooks/use-route-matrix";
 
 type SortMode = "price" | "distance" | "value";
 
@@ -75,6 +76,8 @@ export function NearbyStations({
   const [brandFilter, setBrandFilter] = useState("ALL");
   const [showAll, setShowAll] = useState(false);
 
+  const { routes, loading: routeLoading, error: routeError, candidateCount: routeCandidateCount } = useRouteMatrix(coords, stations);
+
   useEffect(() => {
     for (const station of stations) {
       if (!favorites.some((favorite) => favorite.id === station.id)) continue;
@@ -106,16 +109,21 @@ export function NearbyStations({
 
   const enriched = useMemo(() => {
     return stations.map((station) => {
+      const route = routes[station.id];
+      const routeDistanceKm = route?.distanceKm ?? station.distanceKm;
       const refillCost = station.price * quantity;
-      const arrivalCost = station.distanceKm * (consumption / 100) * station.price;
+      const arrivalCost = routeDistanceKm * (consumption / 100) * station.price;
       return {
         station,
+        routeDistanceKm,
+        routeDurationMin: route?.durationMin ?? null,
+        hasRealRoute: Boolean(route),
         refillCost,
         arrivalCost,
         totalCost: refillCost + arrivalCost,
       };
     });
-  }, [stations, quantity, consumption]);
+  }, [stations, routes, quantity, consumption]);
 
   const filtered = useMemo(() => {
     const next = brandFilter === "ALL"
@@ -124,7 +132,7 @@ export function NearbyStations({
 
     return [...next].sort((a, b) => {
       if (sortMode === "distance") {
-        return a.station.distanceKm - b.station.distanceKm || a.station.price - b.station.price;
+        return a.routeDistanceKm - b.routeDistanceKm || a.station.price - b.station.price;
       }
 
       if (sortMode === "value") {
@@ -141,8 +149,8 @@ export function NearbyStations({
     ? [...enriched].sort((a, b) => a.totalCost - b.totalCost || a.station.price - b.station.price)[0]
     : null;
 
-  const nearest = stations.length
-    ? [...stations].sort((a, b) => a.distanceKm - b.distanceKm || a.price - b.price)[0]
+  const nearest = enriched.length
+    ? [...enriched].sort((a, b) => a.routeDistanceKm - b.routeDistanceKm || a.station.price - b.station.price)[0]
     : null;
 
   return (
@@ -279,6 +287,13 @@ export function NearbyStations({
         </div>
       ) : null}
 
+      {routeLoading ? (
+        <div className="route-status nearby-route-loading">◌ Изчисляваме реалния пътен маршрут за {routeCandidateCount} близки станции…</div>
+      ) : null}
+      {routeError ? (
+        <div className="route-status nearby-route-error">◌ {routeError} Показваме географско разстояние като резервен вариант.</div>
+      ) : null}
+
       {enriched.length > 0 ? (
         <div className="nearby-summary">
           <div>
@@ -287,7 +302,7 @@ export function NearbyStations({
           </div>
           <div>
             <span>НАЙ-БЛИЗКА</span>
-            <strong>{nearest ? `${nearest.distanceKm.toFixed(1)} km` : "—"}</strong>
+            <strong>{nearest ? nearest.routeDistanceKm.toFixed(1) + " km" : "—"}</strong>
           </div>
           <div>
             <span>НАЙ-ИЗГОДНА</span>
@@ -308,7 +323,7 @@ export function NearbyStations({
       ) : null}
 
       <div className="station-list nearby-station-list">
-        {visible.map(({ station, arrivalCost }, index) => {
+        {visible.map(({ station, arrivalCost, routeDistanceKm, routeDurationMin, hasRealRoute }, index) => {
           const isBestValue = bestValue?.station.id === station.id;
           const isCheapest = cheapestPrice != null && station.price === cheapestPrice;
           const isNearest = nearest?.id === station.id;
@@ -345,8 +360,8 @@ export function NearbyStations({
 
               <div className="station-price nearby-price">
                 <strong>{fmt.format(station.price)}</strong>
-                <span>{station.distanceKm.toFixed(1)} km</span>
-                <small>път до там ≈ {money2.format(arrivalCost)}</small>
+                <span>{routeDistanceKm.toFixed(1)} km{hasRealRoute ? " по пътя" : ""}</span>
+                <small>{hasRealRoute && routeDurationMin != null ? Math.round(routeDurationMin) + " мин · " : ""}до станцията ≈ {money2.format(arrivalCost)}</small>
               </div>
 
               <a className="nearby-nav" href={navigationUrl(station)} target="_blank" rel="noreferrer">
@@ -370,7 +385,7 @@ export function NearbyStations({
       </p>
 
       <p className="nearby-disclaimer">
-        Цената за достигане е ориентировъчна: използва посочения разход и географското разстояние до станцията, а не реален пътен маршрут.
+        Цената за достигане използва реален пътен маршрут, когато маршрутизаторът е наличен. Ако няма маршрут, временно се използва географското разстояние.
       </p>
     </article>
   );
