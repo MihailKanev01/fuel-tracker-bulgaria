@@ -9,7 +9,6 @@ import { ThemeToggle } from "./theme-toggle";
 import { FUEL_OPTIONS } from "@/lib/fuel";
 import { NearbyStations } from "./nearby-stations";
 import { useFuelPreferences } from "@/hooks/use-fuel-preferences";
-import { AlertCenter } from "./alert-center";
 
 const fmt = new Intl.NumberFormat("bg-BG", { style: "currency", currency: "EUR", minimumFractionDigits: 3 });
 
