@@ -49,14 +49,14 @@ function getOrCreateUserKey() {
 }
 
 async function request<T>(url: string, init?: RequestInit, userKey?: string | null): Promise<T> {
+  const headers = new Headers(init?.headers);
+  headers.set("Accept", "application/json");
+  if (init?.body) headers.set("Content-Type", "application/json");
+  if (userKey) headers.set("x-fueltracker-user-key", userKey);
+
   const response = await fetch(url, {
     ...init,
-    headers: {
-      Accept: "application/json",
-      ...(init?.body ? { "Content-Type": "application/json" } : {}),
-      ...(userKey ? { "x-fueltracker-user-key": userKey } : {}),
-      ...(init?.headers ?? {}),
-    },
+    headers,
   });
   const payload = await response.json().catch(() => null);
   if (!response.ok) {
