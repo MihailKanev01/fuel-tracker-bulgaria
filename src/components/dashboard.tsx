@@ -8,13 +8,26 @@ import { DieselForecast } from "./diesel-forecast";
 import { ThemeToggle } from "./theme-toggle";
 import { FUEL_OPTIONS, type FuelKey } from "@/lib/fuel";
 import { NearbyStations } from "./nearby-stations";
+import { useFuelPreferences } from "@/hooks/use-fuel-preferences";
 
 const fmt = new Intl.NumberFormat("bg-BG", { style: "currency", currency: "EUR", minimumFractionDigits: 3 });
 
 export function Dashboard() {
-  const [fuel, setFuel] = useState<FuelKey>("diesel");
-  const [period, setPeriod] = useState(30);
-  const [radius, setRadius] = useState(5);
+  const {
+    fuel,
+    setFuel,
+    period,
+    setPeriod,
+    radius,
+    setRadius,
+    quantity,
+    setQuantity,
+    consumption,
+    setConsumption,
+    favorites,
+    toggleFavorite,
+    updateFavoriteFromLive,
+  } = useFuelPreferences();
 
   const {
     overview,
@@ -62,6 +75,13 @@ return <main className="shell">
         nearbyLoading={nearbyLoading}
         locationError={locationError}
         refreshLocation={refreshLocation}
+        quantity={quantity}
+        setQuantity={setQuantity}
+        consumption={consumption}
+        setConsumption={setConsumption}
+        favorites={favorites}
+        onToggleFavorite={toggleFavorite}
+        onUpdateFavorite={updateFavoriteFromLive}
       />
 <article className="panel" id="changes"><div className="panel-title"><h3>ПОСЛЕДНИ НОВИНИ · {label.toUpperCase()}</h3><a href="#">Цял журнал →</a></div><div className="news-summary"><div className="news-group"><div className="news-label up">ДОБРИ НОВИНИ</div>{goodNews.length ? goodNews.map((item)=><a key={item.id} className="news-item" href={item.url} target="_blank" rel="noreferrer"><strong>{item.title}</strong><span>{item.publisher} · {age(item.publishedAt)}</span></a>) : <div className="empty">Няма достатъчно добри релевантни новини за {label}.</div>}</div><div className="news-group"><div className="news-label down">ЛОШИ НОВИНИ</div>{badNews.length ? badNews.map((item)=><a key={item.id} className="news-item" href={item.url} target="_blank" rel="noreferrer"><strong>{item.title}</strong><span>{item.publisher} · {age(item.publishedAt)}</span></a>) : <div className="empty">Няма достатъчно лоши релевантни новини за {label}.</div>}</div></div></article></section>
     <DieselForecast fuel={fuel}/><section className="insight"><div className="signal">⌁</div><div><p className="eyebrow">ПАЗАРЕН КОНТЕКСТ</p><h3>Какво движи {label.toLowerCase()}?</h3><p>Тази секция показва проверени факти от свързани пазарни източници. Причинно-следствени изводи не се правят, докато данните не са достатъчни.</p></div><span className="pending">Очаква пазарни данни</span></section><footer>FUEL TRACKER BULGARIA <span>·</span> Цените се публикуват с източник, час и индикатор за свежест.</footer>
