@@ -1,12 +1,12 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo } from "react";
 import { Area, AreaChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { useDashboardData } from "@/hooks/use-dashboard-data";
 import { age } from "@/lib/dashboard-utils";
 import { DieselForecast } from "./diesel-forecast";
 import { ThemeToggle } from "./theme-toggle";
-import { FUEL_OPTIONS, type FuelKey } from "@/lib/fuel";
+import { FUEL_OPTIONS } from "@/lib/fuel";
 import { NearbyStations } from "./nearby-stations";
 import { useFuelPreferences } from "@/hooks/use-fuel-preferences";
 
