@@ -95,7 +95,8 @@ export function TripPlanner({
   };
 
   useEffect(() => {
-    if (!trip || !coords || !selected) return;
+    const activeDestination = destination;
+    if (!trip || !coords || !selected || !activeDestination) return;
     let cancelled = false;
     let map: any = null;
     loadLeaflet().then((L) => {
@@ -110,7 +111,7 @@ export function TripPlanner({
       const selectedPoints = selected.route.geometry.map(([lon, lat]) => [lat, lon]);
       const selectedLine = L.polyline(selectedPoints, { color: "#c8f65b", weight: 6, opacity: 0.95 }).addTo(map);
       L.circleMarker([coords.lat, coords.lon], { radius: 8, color: "#0b1110", weight: 3, fillColor: "#4da3ff", fillOpacity: 1 }).addTo(map).bindTooltip("Старт");
-      L.circleMarker([destination.lat, destination.lon], { radius: 8, color: "#0b1110", weight: 3, fillColor: "#d8a24a", fillOpacity: 1 }).addTo(map).bindTooltip("Крайна точка");
+      L.circleMarker([activeDestination.lat, activeDestination.lon], { radius: 8, color: "#0b1110", weight: 3, fillColor: "#d8a24a", fillOpacity: 1 }).addTo(map).bindTooltip("Крайна точка");
       L.circleMarker([selected.station.latitude, selected.station.longitude], { radius: 8, color: "#0b1110", weight: 3, fillColor: "#c8f65b", fillOpacity: 1 }).addTo(map).bindTooltip("Избрана станция");
       map.fitBounds(L.featureGroup([baseLine, selectedLine]).getBounds().pad(0.15), { maxZoom: 12, animate: false });
       setTimeout(() => map.invalidateSize(), 80);
