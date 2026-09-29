@@ -226,7 +226,7 @@ export function Dashboard() {
         )}
       </section>
 
-      <section className="content-section" id="cheapest">
+      <section className="content-section">
         <NearbyStations
           fuel={fuel}
           fuelLabel={label}
