@@ -1,0 +1,22 @@
+name: Stage 5 validation
+
+on:
+  push:
+    branches:
+      - feature/stage-5-alerts
+  pull_request:
+    branches:
+      - main
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npx prisma validate
+      - run: npm run typecheck
