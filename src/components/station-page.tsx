@@ -48,8 +48,9 @@ export function StationPage({ station }: { station: StationDetail }) {
   }, [history]);
 
   const toggle = () => {
-    if (isFavorite) {
-      toggleFavorite(station);
+    const existingFavorite = favorites.find((favorite) => favorite.id === station.id);
+    if (existingFavorite) {
+      toggleFavorite(existingFavorite);
       return;
     }
 
