@@ -1,7 +1,8 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import type { NearbyStation } from "@/hooks/use-dashboard-data";
+import type { FavoriteStation } from "@/hooks/use-fuel-preferences";
 import { age } from "@/lib/dashboard-utils";
 import { LocationMap } from "./location-map";
 
@@ -19,7 +20,7 @@ const money2 = new Intl.NumberFormat("bg-BG", {
   minimumFractionDigits: 2,
 });
 
-function navigationUrl(station: NearbyStation) {
+function navigationUrl(station: FavoriteStation | NearbyStation) {
   const destination = station.latitude != null && station.longitude != null
     ? `${station.latitude},${station.longitude}`
     : `${station.name}, ${station.address}`;
@@ -42,6 +43,13 @@ export function NearbyStations({
   nearbyLoading,
   locationError,
   refreshLocation,
+  quantity,
+  setQuantity,
+  consumption,
+  setConsumption,
+  favorites,
+  onToggleFavorite,
+  onUpdateFavorite,
 }: {
   fuelLabel: string;
   radius: number;
@@ -52,12 +60,24 @@ export function NearbyStations({
   nearbyLoading: boolean;
   locationError: string | null;
   refreshLocation: () => void;
+  quantity: number;
+  setQuantity: (value: number) => void;
+  consumption: number;
+  setConsumption: (value: number) => void;
+  favorites: FavoriteStation[];
+  onToggleFavorite: (station: FavoriteStation) => void;
+  onUpdateFavorite: (station: FavoriteStation) => void;
 }) {
   const [sortMode, setSortMode] = useState<SortMode>("price");
   const [brandFilter, setBrandFilter] = useState("ALL");
-  const [quantity, setQuantity] = useState(50);
-  const [consumption, setConsumption] = useState(7);
   const [showAll, setShowAll] = useState(false);
+
+  useEffect(() => {
+    for (const station of stations) {
+      if (!favorites.some((favorite) => favorite.id === station.id)) continue;
+      onUpdateFavorite(station);
+    }
+  }, [stations, favorites, onUpdateFavorite]);
 
   const brands = useMemo(() => {
     return [...new Set(
@@ -66,6 +86,16 @@ export function NearbyStations({
         .filter((brand): brand is string => Boolean(brand)),
     )].sort((a, b) => a.localeCompare(b, "bg"));
   }, [stations]);
+
+  const favoriteIds = useMemo(
+    () => new Set(favorites.map((favorite) => favorite.id)),
+    [favorites],
+  );
+
+  const favoriteStations = useMemo(
+    () => favorites.map((favorite) => stations.find((station) => station.id === favorite.id) ?? favorite),
+    [favorites, stations],
+  );
 
   const cheapestPrice = stations.length
     ? Math.min(...stations.map((station) => station.price))
@@ -128,7 +158,41 @@ export function NearbyStations({
         </button>
       </div>
 
-      <div className="nearby-controls">
+      {favorites.length > 0 ? (
+        <div className="favorites-strip">
+          <div className="favorites-strip-head">
+            <div>
+              <span className="favorites-kicker">ЗАПАЗЕНИ</span>
+              <strong>Моите станции</strong>
+            </div>
+            <small>{favorites.length}/30</small>
+          </div>
+          <div className="favorites-list">
+            {favoriteStations.map((station) => {
+              const live = stations.find((item) => item.id === station.id);
+              return (
+                <div key={station.id} className="favorite-card">
+                  <div className="favorite-card-main">
+                    <span className="favorite-star">★</span>
+                    <div>
+                      <strong>{station.brand ?? station.name}</strong>
+                      <small>{station.city} · {live ? age(live.observedAt) : `запазено · ${age(station.observedAt)}`}</small>
+                    </div>
+                  </div>
+                  <div className="favorite-card-price">
+                    <strong>{fmt.format(live?.price ?? station.price)}</strong>
+                    <button type="button" onClick={() => onToggleFavorite(station)} aria-label={`Премахни ${station.brand ?? station.name} от любими`} title="Премахни от любими">×</button>
+                  </div>
+                  <a href={navigationUrl(station)} target="_blank" rel="noreferrer" className="favorite-nav">→</a>
+                </div>
+              );
+            })}
+          </div>
+          <p className="favorites-note">Любимите се пазят само на това устройство в браузъра ти.</p>
+        </div>
+      ) : null}
+
+            <div className="nearby-controls">
         <div className="periods nearby-periods" role="group" aria-label="Радиус за близки станции">
           {[5, 10, 25, 50].map((value) => (
             <button
@@ -252,6 +316,15 @@ export function NearbyStations({
                   {isBestValue ? <span className="nearby-badge">НАЙ-ИЗГОДНА</span> : null}
                   {isCheapest ? <span className="nearby-badge muted">НАЙ-ЕВТИНА</span> : null}
                   {isNearest ? <span className="nearby-badge muted">НАЙ-БЛИЗКА</span> : null}
+                  <button
+                    type="button"
+                    className={favoriteIds.has(station.id) ? "favorite-button saved" : "favorite-button"}
+                    onClick={() => onToggleFavorite(station)}
+                    aria-label={favoriteIds.has(station.id) ? `Премахни ${station.brand ?? station.name} от любими` : `Добави ${station.brand ?? station.name} в любими`}
+                    title={favoriteIds.has(station.id) ? "Премахни от любими" : "Добави в любими"}
+                  >
+                    {favoriteIds.has(station.id) ? "★" : "☆"}
+                  </button>
                 </div>
                 <span>{station.city} · {station.address}</span>
                 <small>
@@ -280,6 +353,10 @@ export function NearbyStations({
       ) : null}
 
       <LocationMap latitude={coords?.lat ?? null} longitude={coords?.lon ?? null} radiusKm={radius} stations={stations} />
+
+      <p className="nearby-disclaimer">
+        Любимите, количеството и разходът се запазват автоматично за следващото отваряне на сайта.
+      </p>
 
       <p className="nearby-disclaimer">
         Цената за достигане е ориентировъчна: използва посочения разход и географското разстояние до станцията, а не реален пътен маршрут.
