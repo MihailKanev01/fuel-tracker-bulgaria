@@ -3,6 +3,7 @@
 import { useMemo, useState } from "react";
 import type { NearbyStation } from "@/hooks/use-dashboard-data";
 import { age } from "@/lib/dashboard-utils";
+import { LocationMap } from "./location-map";
 
 type SortMode = "price" | "distance" | "value";
 
@@ -277,6 +278,8 @@ export function NearbyStations({
           {showAll ? "Покажи по-малко" : \`Покажи още \${filtered.length - 8} станции\`}
         </button>
       ) : null}
+
+      <LocationMap latitude={coords?.lat ?? null} longitude={coords?.lon ?? null} radiusKm={radius} stations={stations} />
 
       <p className="nearby-disclaimer">
         Цената за достигане е ориентировъчна: използва посочения разход и географското разстояние до станцията, а не реален пътен маршрут.
