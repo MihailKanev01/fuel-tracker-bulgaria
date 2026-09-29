@@ -60,6 +60,8 @@ Implemented endpoints include:
 - `GET /api/news`
 - `GET /api/market-data`
 - `POST /api/routing` — real road distances and estimated travel times to nearby stations
+- `POST /api/geocode` — user-triggered destination search through Nominatim/OpenStreetMap
+- `POST /api/trip` — direct trip route plus station comparisons and detour costs
 - `GET /api/admin/sources`
 - `POST /api/collect`
 
@@ -107,9 +109,13 @@ The database debug endpoint `/api/debug/db` is development-only and returns 404 
 
 The nearby-station view uses an OSRM-compatible road matrix for up to 20 candidate stations at a time. When the routing provider is unavailable, the UI falls back to the existing geographic distance so the nearby list remains usable.
 
+The trip planner geocodes destinations only after an explicit user search, returns a small result set, caches results briefly, and does not implement autocomplete. This follows the public Nominatim usage policy. 
+
 ## Production considerations
 
 Automated collection should only be configured for sources whose terms, licence, robots policy and rate limits permit it.
+
+The trip planner relies on an OSRM-compatible routing service configured by `ROUTING_URL`. The current default is the public OSRM endpoint; for higher traffic, configure a dedicated/self-hosted routing service.
 
 Before production rollout, the project should also have:
 
