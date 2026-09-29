@@ -16,7 +16,6 @@ export async function GET() {
     });
 
     return NextResponse.json({
-      databaseHost: safeHost(),
       prices: groups.map((row) => ({
         fuelType: row.fuelType,
         anomaly: row.anomaly,
