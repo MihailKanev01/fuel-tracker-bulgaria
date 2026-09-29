@@ -10,7 +10,8 @@
     "db:generate": "prisma generate",
     "db:migrate": "prisma migrate dev",
     "collect": "tsx src/jobs/run-collectors.ts",
-    "postinstall": "prisma generate"
+    "postinstall": "prisma generate",
+    "typecheck": "tsc --noEmit"
   },
   "dependencies": {
     "@prisma/client": "^6.6.0",
