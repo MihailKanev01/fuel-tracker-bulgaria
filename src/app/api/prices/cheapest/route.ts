@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { FuelType } from "@prisma/client";
 import { cheapestFuel } from "@/lib/queries";
+import { parseIntegerParam } from "@/lib/api-params";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
@@ -17,7 +18,7 @@ export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
   const fuel = aliases[(searchParams.get("fuel") ?? "diesel").toLowerCase()];
   if (!fuel) return NextResponse.json({ error: "Unsupported fuel type" }, { status: 400 });
-  const limit = Math.min(100, Math.max(1, Number(searchParams.get("limit") ?? 10)));
+  const limit = parseIntegerParam(searchParams.get("limit"), 10, 1, 100);
   try {
     const result = await cheapestFuel(fuel, limit, searchParams.get("city") ?? undefined);
     return NextResponse.json(result, { headers: { "Cache-Control": "no-store, max-age=0" } });
