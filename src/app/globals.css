@@ -910,3 +910,20 @@ body { font-size:16px }.brand { font-size:22px }.brand i { font-size:11px } nav 
   .calculator-bottom-grid { grid-template-columns:1fr; gap:8px; }
   .calculator-result-grid strong { font-size:16px; }
 }
+
+.route-status {
+  margin-top:10px;
+  padding:9px 11px;
+  border:1px solid #2e4138;
+  border-radius:8px;
+  color:#8f9f98;
+  background:#111a17;
+  font:9px/1.5 'DM Mono';
+}
+.nearby-route-error { color:#a99b91; }
+.nearby-route-loading { color:#95aa9f; }
+:root[data-theme="light"] .route-status {
+  border-color:#d7e2dc;
+  background:#f7faf8;
+  color:#65746e;
+}
