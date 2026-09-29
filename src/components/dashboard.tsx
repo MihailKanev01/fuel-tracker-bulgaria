@@ -10,6 +10,7 @@ import { FUEL_OPTIONS } from "@/lib/fuel";
 import { NearbyStations } from "./nearby-stations";
 import { useFuelPreferences } from "@/hooks/use-fuel-preferences";
 import { AlertCenter } from "./alert-center";
+import { FuelCalculator } from "./fuel-calculator";
 
 const fmt = new Intl.NumberFormat("bg-BG", { style: "currency", currency: "EUR", minimumFractionDigits: 3 });
 
@@ -56,6 +57,11 @@ export function Dashboard() {
 
   const hasData = overview?.average != null;
 
+  const cheapestNearby = useMemo(
+    () => nearby.length ? nearby.reduce((best, station) => station.price < best.price ? station : best) : null,
+    [nearby],
+  );
+
 return <main className="shell">
     <header><a className="brand" href="/">Fuel<span>Tracker</span><i>BG</i></a><nav><a className="active" href="#overview">Обзор</a><a href="#cheapest">Най-евтин</a><a href="#changes">Промени</a><a href="/admin">Админ</a></nav><div className="header-actions"><ThemeToggle /><button className="live"><b /> Данни на живо</button></div></header>
     <section className="fuel-selector-section"><div><p className="eyebrow">ИЗБЕРИ ГОРИВО</p><div className="fuel-selector">{FUEL_OPTIONS.map((option) => <button key={option.key} type="button" className={fuel === option.key ? "selected" : ""} onClick={() => setFuel(option.key)}>{option.label}</button>)}</div></div></section>
@@ -86,7 +92,17 @@ return <main className="shell">
         onUpdateFavorite={updateFavoriteFromLive}
       />
 <article className="panel" id="changes"><div className="panel-title"><h3>ПОСЛЕДНИ НОВИНИ · {label.toUpperCase()}</h3><a href="#">Цял журнал →</a></div><div className="news-summary"><div className="news-group"><div className="news-label up">ДОБРИ НОВИНИ</div>{goodNews.length ? goodNews.map((item)=><a key={item.id} className="news-item" href={item.url} target="_blank" rel="noreferrer"><strong>{item.title}</strong><span>{item.publisher} · {age(item.publishedAt)}</span></a>) : <div className="empty">Няма достатъчно добри релевантни новини за {label}.</div>}</div><div className="news-group"><div className="news-label down">ЛОШИ НОВИНИ</div>{badNews.length ? badNews.map((item)=><a key={item.id} className="news-item" href={item.url} target="_blank" rel="noreferrer"><strong>{item.title}</strong><span>{item.publisher} · {age(item.publishedAt)}</span></a>) : <div className="empty">Няма достатъчно лоши релевантни новини за {label}.</div>}</div></div></article></section>
-    <DieselForecast fuel={fuel}/><section className="insight"><div className="signal">⌁</div><div><p className="eyebrow">ПАЗАРЕН КОНТЕКСТ</p><h3>Какво движи {label.toLowerCase()}?</h3><p>Тази секция показва проверени факти от свързани пазарни източници. Причинно-следствени изводи не се правят, докато данните не са достатъчни.</p></div><span className="pending">Очаква пазарни данни</span></section><footer>FUEL TRACKER BULGARIA <span>·</span> Цените се публикуват с източник, час и индикатор за свежест.</footer>
+    <DieselForecast fuel={fuel}/>
+    <FuelCalculator
+      fuel={fuel}
+      fuelLabel={label}
+      averagePrice={overview?.average ?? null}
+      cheapestNearby={cheapestNearby?.price ?? null}
+      cheapestNearbyName={cheapestNearby ? (cheapestNearby.brand ?? cheapestNearby.name) : null}
+      quantity={quantity}
+      consumption={consumption}
+    />
+    <section className="insight"><div className="signal">⌁</div><div><p className="eyebrow">ПАЗАРЕН КОНТЕКСТ</p><h3>Какво движи {label.toLowerCase()}?</h3><p>Тази секция показва проверени факти от свързани пазарни източници. Причинно-следствени изводи не се правят, докато данните не са достатъчни.</p></div><span className="pending">Очаква пазарни данни</span></section><footer>FUEL TRACKER BULGARIA <span>·</span> Цените се публикуват с източник, час и индикатор за свежест.</footer>
   </main>;
 }
 function Empty({label}:{label:string}){return <div className="empty"><span>◌</span>{label}</div>;
