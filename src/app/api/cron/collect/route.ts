@@ -8,7 +8,12 @@ export async function GET(request: Request) {
   const configured = process.env.CRON_SECRET;
   const authorization = request.headers.get("authorization");
 
-  if (configured && authorization !== `Bearer ${configured}`) {
+  if (!configured) {
+    console.error("CRON_SECRET is not configured.");
+    return NextResponse.json({ error: "Cron authentication is not configured." }, { status: 503 });
+  }
+
+  if (authorization !== `Bearer ${configured}`) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
