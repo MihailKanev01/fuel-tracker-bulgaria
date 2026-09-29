@@ -5,8 +5,6 @@ import { Area, AreaChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YA
 import { useFuelPreferences } from "@/hooks/use-fuel-preferences";
 import type { StationDetail } from "@/lib/station";
 import { age } from "@/lib/dashboard-utils";
-import { StationAlerts } from "./station-alerts";
-import type { FuelKey } from "@/lib/fuel";
 
 const fmt = new Intl.NumberFormat("bg-BG", {
   style: "currency",
@@ -29,14 +27,6 @@ export function StationPage({ station }: { station: StationDetail }) {
   const [range, setRange] = useState<Range>(30);
 
   const isFavorite = favorites.some((favorite) => favorite.id === station.id);
-  const stationFuel = ({
-    DIESEL: "diesel",
-    GASOLINE_95: "a95",
-    GASOLINE_100: "a100",
-    LPG: "lpg",
-    CNG: "cng",
-  } as const)[station.fuelType] as FuelKey;
-
   const history = useMemo(() => {
     const from = Date.now() - range * 86_400_000;
     return station.history.filter((item) => new Date(item.date + "T23:59:59").getTime() >= from);
@@ -136,8 +126,6 @@ export function StationPage({ station }: { station: StationDetail }) {
           </div>
         </section>
       ) : null}
-
-      <StationAlerts station={station} fuel={stationFuel} />
 
       {station.liveOnly ? (
         <div className="station-notice">
