@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+
 import { useAlerts, type UserAlert } from "@/hooks/use-alerts";
 
 const fmt = new Intl.NumberFormat("bg-BG", {
@@ -20,14 +20,7 @@ export function AlertCenter() {
     loading,
     error,
     removeAlert,
-    requestBrowserNotifications,
   } = useAlerts();
-  const [permission, setPermission] = useState<NotificationPermission | "unsupported">("default");
-  const [permissionError, setPermissionError] = useState<string | null>(null);
-
-  useEffect(() => {
-    setPermission("Notification" in window ? Notification.permission : "unsupported");
-  }, []);
 
   const active = alerts.filter((alert) => alert.active);
 
@@ -110,7 +103,7 @@ export function AlertCenter() {
       )}
 
       <p className="alert-note">
-        Проверката е свързана с новите ценови наблюдения. Браузърното известие се показва, когато сайтът е отворен и има дадено разрешение.
+        Проверката е свързана с новите ценови наблюдения. Правилата се пазят за този браузър и се виждат в този панел.
       </p>
     </section>
   );
