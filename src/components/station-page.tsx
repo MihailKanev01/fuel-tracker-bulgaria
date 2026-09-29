@@ -108,6 +108,24 @@ export function StationPage({ station }: { station: StationDetail }) {
         {station.sourceUrl ? <a href={station.sourceUrl} target="_blank" rel="noreferrer">Източник на цената →</a> : null}
       </section>
 
+      {station.latitude != null && station.longitude != null ? (
+        <section className="station-map-wrap panel">
+          <div className="panel-title">
+            <div>
+              <h3>МЕСТОПОЛОЖЕНИЕ</h3>
+              <small className="nearby-meta">{station.latitude.toFixed(6)}, {station.longitude.toFixed(6)}</small>
+            </div>
+          </div>
+          <div className="station-map">
+            <iframe
+              title={`Карта на ${station.brand ?? station.name}`}
+              src={`https://www.openstreetmap.org/export/embed.html?bbox=${station.longitude - 0.006}%2C${station.latitude - 0.004}%2C${station.longitude + 0.006}%2C${station.latitude + 0.004}&layer=mapnik&marker=${station.latitude}%2C${station.longitude}`}
+              loading="lazy"
+            />
+          </div>
+        </section>
+      ) : null}
+
       {station.liveOnly ? (
         <div className="station-notice">
           <strong>Live станция от Fuelo</strong>
