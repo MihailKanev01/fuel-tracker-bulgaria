@@ -91,6 +91,18 @@ The app can also consume an authorised CSV source with the following columns:
 name,address,city,brand,region,latitude,longitude,fuel,price,currency,observed_at,url
 ```
 
+
+### Production environment
+
+Set these environment variables before deploying:
+
+- `DATABASE_URL` — PostgreSQL connection string.
+- `COLLECTOR_SECRET` — protects the manual `POST /api/collect` endpoint.
+- `CRON_SECRET` — protects the scheduled `GET /api/cron/collect` endpoint. The cron endpoint fails closed when this is missing.
+- `ADMIN_USER` and `ADMIN_PASSWORD` — HTTP Basic Auth credentials for `/admin` and `/api/admin/*` in production.
+
+The database debug endpoint `/api/debug/db` is development-only and returns 404 in production.
+
 ## Production considerations
 
 Automated collection should only be configured for sources whose terms, licence, robots policy and rate limits permit it.
